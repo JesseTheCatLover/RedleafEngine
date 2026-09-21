@@ -5,6 +5,10 @@
 #include "GLFW/glfw3.h"
 #include <iostream>
 
+#if defined(JENGINE_PLATFORM_WINDOWS)
+#include "stb/stb_image.h"
+#endif
+
 GLFWWindow::GLFWWindow(const FWindowDesc& initialState, GLFWwindow* shareContext)
     : m_State(initialState)
     , m_ShareContext(shareContext)
@@ -504,6 +508,40 @@ void GLFWWindow::SetVSync(bool vSync)
     if (m_Window)
         glfwSwapInterval(vSync ? 1 : 0);
 }
+
+#if defined(JENGINE_PLATFORM_WINDOWS)
+void GLFWWindow::SetIcon(const std::string& iconPath)
+{
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+
+    unsigned char* pixels = stbi_load(
+        iconPath.c_str(),
+        &width,
+        &height,
+        &channels,
+        4
+    );
+
+    if (!pixels)
+        return;
+
+    GLFWimage image{
+        width,
+        height,
+        pixels
+    };
+
+    glfwSetWindowIcon(
+        m_Window,
+        1,
+        &image
+    );
+
+    stbi_image_free(pixels);
+}
+#endif
 
 std::string GLFWWindow::GetTitle()
 {

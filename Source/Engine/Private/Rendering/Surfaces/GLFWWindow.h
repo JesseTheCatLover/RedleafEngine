@@ -77,6 +77,10 @@ public:
     void SetTitle(const std::string& title) override;
     void SetVSync(bool vSync) override;
 
+#if defined(JENGINE_PLATFORM_WINDOWS)
+    void SetIcon(const std::string &iconPath) override;
+#endif
+
     std::string GetTitle() override;
 
     void* GetNativeHandle() const override;
