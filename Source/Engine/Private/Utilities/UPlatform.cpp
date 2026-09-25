@@ -6,6 +6,7 @@
 #include <string>
 
 #if JENGINE_PLATFORM_WINDOWS
+    #include <windows.h>
     #include <shellapi.h>
 #endif
 
