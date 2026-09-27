@@ -1,3 +1,21 @@
+[submodule "ThirdParty/glfw"]
+	path = ThirdParty/glfw
+	url = https://github.com/glfw/glfw.git
+	shallow = true
+[submodule "ThirdParty/assimp"]
+	path = ThirdParty/assimp
+	url = https://github.com/assimp/assimp.git
+	shallow = true
+[submodule "ThirdParty/glm"]
+	path = ThirdParty/glm
+	url = https://github.com/JesseTheCatLover/glm.git
+	shallow = true
+[submodule "ThirdParty/nlohmann_json"]
+	path = ThirdParty/nlohmann_json
+	url = https://github.com/nlohmann/json.git
+	shallow = true
 [submodule "ThirdParty/imgui"]
 	path = ThirdParty/imgui
 	url = https://github.com/ocornut/imgui.git
+	branch = docking
+	shallow = true
