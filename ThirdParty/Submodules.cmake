@@ -3,9 +3,22 @@
 # --- Validate submodules ---
 
 function(redleaf_require_submodule NAME PATH)
-    if(NOT EXISTS "${PATH}")
+    if(NOT IS_DIRECTORY "${PATH}")
         message(FATAL_ERROR
-                "${NAME} submodule is missing.\n"
+                "${NAME} submodule directory does not exist.\n"
+                "Initialize the repository dependencies with:\n"
+                "    git submodule update --init --recursive\n"
+                "from the RedleafEngine root directory."
+        )
+    endif()
+
+    file(GLOB SUBMODULE_CONTENT
+            "${PATH}/*"
+    )
+
+    if(NOT SUBMODULE_CONTENT)
+        message(FATAL_ERROR
+                "${NAME} submodule directory is empty.\n"
                 "Initialize the repository dependencies with:\n"
                 "    git submodule update --init --recursive\n"
                 "from the RedleafEngine root directory."
