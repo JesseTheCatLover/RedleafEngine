@@ -662,7 +662,7 @@ bool FolderPickerDialog::HandlePendingDeleteButton(const std::string &nodePath, 
     if (x > ImGui::GetCursorPosX())
         ImGui::SetCursorPosX(x);
 
-    ImGui::SetItemAllowOverlap();
+    ImGui::SetNextItemAllowOverlap();
 
     ImGui::PushID(id);
     if (ImGui::SmallButton("X"))

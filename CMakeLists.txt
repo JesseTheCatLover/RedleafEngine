@@ -1,5 +1,8 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.30)
 project(RedleafEngine VERSION 0.1 LANGUAGES C CXX)
+if(APPLE)
+    enable_language(OBJC)
+endif()
 
 set(REDLEAF_DOC_VERSION "Alpha")
 
@@ -12,7 +15,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/BuildSystem")
 
 include(RedleafOptions)
 include(RedleafPlatform)
-include(RedleafDependencies)
 include(RedleafUtilities)
 include(RedleafExecutable)
 include(RedleafReflection)

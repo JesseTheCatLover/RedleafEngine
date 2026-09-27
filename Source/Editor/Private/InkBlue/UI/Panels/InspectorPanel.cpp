@@ -27,7 +27,7 @@ namespace
         ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(70, 70, 70, 255));
         ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(34, 34, 34, 140));
         ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(72, 72, 72, 255));
-        const bool ok = ImGui::BeginChild(id, ImVec2(0, height), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
+        const bool ok = ImGui::BeginChild(id, ImVec2(0, height), ImGuiChildFlags_Borders, ImGuiWindowFlags_None);
         ImGui::PopStyleColor(3);
         ImGui::PopStyleVar(3);
         return ok;

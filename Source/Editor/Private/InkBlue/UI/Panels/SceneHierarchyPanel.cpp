@@ -147,7 +147,7 @@ void SceneHierarchyPanel::DrawActorNode(const FHierarchySnapshot& node,
 
     // --- Button Overlap Hit-Testing ---
     // Tell ImGui to allow the upcoming button to be clicked, even though SpanAvailWidth is covering the line
-    ImGui::SetItemAllowOverlap();
+    ImGui::SetNextItemAllowOverlap();
 
     // 2. Visibility Toggle (Right-aligned)
     ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 24.0f);

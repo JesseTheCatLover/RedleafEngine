@@ -40,7 +40,7 @@ namespace
 
         ImGui::PopStyleColor(3);
 
-        ImGui::SetItemAllowOverlap();
+        ImGui::SetNextItemAllowOverlap();
 
         bool changed = false;
         if (ImGui::IsItemActive())
