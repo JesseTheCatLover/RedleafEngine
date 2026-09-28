@@ -2,6 +2,7 @@ from pathlib import Path
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import sys
 
@@ -12,6 +13,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parents[1]
 
 CONFIG_PATH = SCRIPT_DIR / "assets.json"
+CMAKE_PATH = PROJECT_ROOT / "CMakeLists.txt"
 
 SOURCE_ASSETS_DIR = PROJECT_ROOT / "SourceAssets"
 ASSETS_DIR = PROJECT_ROOT / "Assets"
@@ -68,6 +70,35 @@ def load_config() -> dict:
             sys.exit(1)
 
     return config
+
+
+def load_asset_version() -> str:
+    try:
+        cmake_text = CMAKE_PATH.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        print(f"ERROR: CMakeLists.txt not found: {CMAKE_PATH}")
+        sys.exit(1)
+
+    match = re.search(
+        r'^\s*set\s*\(\s*REDLEAF_ASSETS_VERSION\s+"([^"]+)"\s*\)',
+        cmake_text,
+        re.MULTILINE,
+    )
+
+    if match is None:
+        print(
+            "ERROR: REDLEAF_ASSETS_VERSION was not found "
+            "in CMakeLists.txt."
+        )
+        sys.exit(1)
+
+    version = match.group(1).strip()
+
+    if not version:
+        print("ERROR: REDLEAF_ASSETS_VERSION is empty.")
+        sys.exit(1)
+
+    return version
 
 
 # --- File discovery ---
@@ -127,7 +158,10 @@ def get_package_path(path: Path) -> str:
         package_path = relative_path
 
     elif relative_path.parts[0] == "Assets":
-        package_path = Path("RawAssets") / relative_path.relative_to("Assets")
+        package_path = (
+                Path("RawAssets")
+                / relative_path.relative_to("Assets")
+        )
 
     else:
         raise ValueError(f"Unsupported asset path: {path}")
@@ -149,7 +183,7 @@ def collect_asset_entries(
 
         if package_path in package_paths:
             print(
-                f"ERROR: Duplicate package path detected: "
+                "ERROR: Duplicate package path detected: "
                 f"{package_path}"
             )
             sys.exit(1)
@@ -237,16 +271,13 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--version",
-        required=True,
-        help="Asset package version.",
-    )
-
-    parser.add_argument(
         "--output",
         type=Path,
         default=None,
-        help="Output directory. Defaults to Build/AssetDistribution/<version>.",
+        help=(
+            "Output directory. Defaults to "
+            "Distribution/Assets/<version>."
+        ),
     )
 
     return parser.parse_args()
@@ -257,6 +288,7 @@ def parse_arguments() -> argparse.Namespace:
 def print_summary(
         entries: list[dict],
         unique_blob_count: int,
+        package_version: str,
         output_dir: Path,
 ) -> None:
     source_entries = [
@@ -273,6 +305,8 @@ def print_summary(
 
     print("Redleaf Asset Package")
     print("=====================")
+    print()
+    print(f"Package version: {package_version}")
     print()
 
     print("Source Assets:")
@@ -309,7 +343,9 @@ def print_summary(
 
 def main() -> None:
     args = parse_arguments()
+
     config = load_config()
+    package_version = load_asset_version()
 
     source_files = collect_files(SOURCE_ASSETS_DIR)
     raw_files = collect_raw_assets(config)
@@ -322,15 +358,18 @@ def main() -> None:
     output_dir = (
         args.output
         if args.output is not None
-        else DEFAULT_OUTPUT_DIR / args.version
+        else DEFAULT_OUTPUT_DIR / package_version
     )
 
     output_dir = output_dir.resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     manifest = build_manifest(
         entries,
-        args.version,
+        package_version,
     )
 
     write_manifest(
@@ -346,6 +385,7 @@ def main() -> None:
     print_summary(
         entries,
         unique_blob_count,
+        package_version,
         output_dir,
     )
 

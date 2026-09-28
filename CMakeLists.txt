@@ -5,6 +5,7 @@ if(APPLE)
 endif()
 
 set(REDLEAF_DOC_VERSION "Alpha")
+set(REDLEAF_ASSETS_VERSION "0.1.0")
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 20)
