@@ -2,6 +2,7 @@ from pathlib import Path
 import argparse
 import hashlib
 import json
+import shutil
 import sys
 
 
@@ -11,10 +12,15 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parents[1]
 
 CONFIG_PATH = SCRIPT_DIR / "assets.json"
-MANIFEST_PATH = SCRIPT_DIR / "manifest.json"
 
 SOURCE_ASSETS_DIR = PROJECT_ROOT / "SourceAssets"
 ASSETS_DIR = PROJECT_ROOT / "Assets"
+
+DEFAULT_OUTPUT_DIR = (
+        PROJECT_ROOT
+        / "Distribution"
+        / "Assets"
+)
 
 
 # --- Configuration ---
@@ -43,14 +49,10 @@ def load_config() -> dict:
         print("ERROR: Configuration root must be an object.")
         sys.exit(1)
 
-    if "format_version" not in config:
-        print("ERROR: Configuration is missing 'format_version'.")
-        sys.exit(1)
-
-    if config["format_version"] != 1:
+    if config.get("format_version") != 1:
         print(
-            f"ERROR: Unsupported configuration format version: "
-            f"{config['format_version']}"
+            "ERROR: Unsupported configuration format version: "
+            f"{config.get('format_version')}"
         )
         sys.exit(1)
 
@@ -103,7 +105,7 @@ def collect_raw_assets(config: dict) -> list[Path]:
 
         raw_files.extend(collect_files(raw_path))
 
-    return sorted(raw_files)
+    return sorted(set(raw_files))
 
 
 # --- Asset metadata ---
@@ -133,32 +135,68 @@ def get_package_path(path: Path) -> str:
     return package_path.as_posix()
 
 
-# --- Manifest generation ---
+# --- Package construction ---
 
-def build_manifest(
+def collect_asset_entries(
         source_files: list[Path],
         raw_files: list[Path],
-        package_version: str,
-) -> dict:
-    files = {}
+) -> list[dict]:
+    entries = []
+    package_paths: set[str] = set()
 
     for path in source_files + raw_files:
         package_path = get_package_path(path)
 
-        files[package_path] = {
-            "sha256": calculate_sha256(path),
-            "size": path.stat().st_size,
+        if package_path in package_paths:
+            print(
+                f"ERROR: Duplicate package path detected: "
+                f"{package_path}"
+            )
+            sys.exit(1)
+
+        package_paths.add(package_path)
+
+        entries.append(
+            {
+                "package_path": package_path,
+                "source_path": path,
+                "sha256": calculate_sha256(path),
+                "size": path.stat().st_size,
+            }
+        )
+
+    return sorted(
+        entries,
+        key=lambda entry: entry["package_path"],
+    )
+
+
+def build_manifest(
+        entries: list[dict],
+        package_version: str,
+) -> dict:
+    files = {}
+
+    for entry in entries:
+        files[entry["package_path"]] = {
+            "sha256": entry["sha256"],
+            "size": entry["size"],
         }
 
     return {
         "format_version": 1,
         "package_version": package_version,
-        "files": dict(sorted(files.items())),
+        "files": files,
     }
 
 
-def write_manifest(manifest: dict) -> None:
-    with MANIFEST_PATH.open("w", encoding="utf-8") as file:
+def write_manifest(
+        manifest: dict,
+        output_dir: Path,
+) -> None:
+    manifest_path = output_dir / "manifest.json"
+
+    with manifest_path.open("w", encoding="utf-8") as file:
         json.dump(
             manifest,
             file,
@@ -168,11 +206,34 @@ def write_manifest(manifest: dict) -> None:
         file.write("\n")
 
 
+def stage_blobs(
+        entries: list[dict],
+        output_dir: Path,
+) -> int:
+    unique_hashes: set[str] = set()
+
+    for entry in entries:
+        sha256 = entry["sha256"]
+        unique_hashes.add(sha256)
+
+        blob_path = output_dir / f"blob-{sha256}"
+
+        if blob_path.exists():
+            continue
+
+        shutil.copyfile(
+            entry["source_path"],
+            blob_path,
+        )
+
+    return len(unique_hashes)
+
+
 # --- Command line ---
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Generate the RedleafEngine asset distribution manifest."
+        description="Build a RedleafEngine asset distribution package."
     )
 
     parser.add_argument(
@@ -181,29 +242,46 @@ def parse_arguments() -> argparse.Namespace:
         help="Asset package version.",
     )
 
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Output directory. Defaults to Build/AssetDistribution/<version>.",
+    )
+
     return parser.parse_args()
 
 
 # --- Output ---
 
 def print_summary(
-        source_files: list[Path],
-        raw_files: list[Path],
+        entries: list[dict],
+        unique_blob_count: int,
+        output_dir: Path,
 ) -> None:
+    source_entries = [
+        entry
+        for entry in entries
+        if entry["package_path"].startswith("SourceAssets/")
+    ]
+
+    raw_entries = [
+        entry
+        for entry in entries
+        if entry["package_path"].startswith("RawAssets/")
+    ]
+
     print("Redleaf Asset Package")
     print("=====================")
     print()
 
     print("Source Assets:")
 
-    if source_files:
-        for path in source_files:
-            relative_path = path.relative_to(PROJECT_ROOT)
-            size = path.stat().st_size
-
+    if source_entries:
+        for entry in source_entries:
             print(
-                f"  {relative_path} "
-                f"({size:,} bytes)"
+                f"  {entry['package_path']} "
+                f"({entry['size']:,} bytes)"
             )
     else:
         print("  <none>")
@@ -211,22 +289,20 @@ def print_summary(
     print()
     print("Raw Assets:")
 
-    if raw_files:
-        for path in raw_files:
-            relative_path = path.relative_to(PROJECT_ROOT)
-            size = path.stat().st_size
-
+    if raw_entries:
+        for entry in raw_entries:
             print(
-                f"  {relative_path} "
-                f"({size:,} bytes)"
+                f"  {entry['package_path']} "
+                f"({entry['size']:,} bytes)"
             )
     else:
         print("  <none>")
 
     print()
-    print(f"Total source files: {len(source_files)}")
-    print(f"Total raw files:    {len(raw_files)}")
-    print(f"Total files:        {len(source_files) + len(raw_files)}")
+    print(f"Total files:        {len(entries)}")
+    print(f"Unique blobs:       {unique_blob_count}")
+    print()
+    print(f"Package written to: {output_dir}")
 
 
 # --- Main ---
@@ -238,18 +314,40 @@ def main() -> None:
     source_files = collect_files(SOURCE_ASSETS_DIR)
     raw_files = collect_raw_assets(config)
 
-    print_summary(source_files, raw_files)
-
-    manifest = build_manifest(
+    entries = collect_asset_entries(
         source_files,
         raw_files,
+    )
+
+    output_dir = (
+        args.output
+        if args.output is not None
+        else DEFAULT_OUTPUT_DIR / args.version
+    )
+
+    output_dir = output_dir.resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    manifest = build_manifest(
+        entries,
         args.version,
     )
 
-    write_manifest(manifest)
+    write_manifest(
+        manifest,
+        output_dir,
+    )
 
-    print()
-    print(f"Manifest written to: {MANIFEST_PATH}")
+    unique_blob_count = stage_blobs(
+        entries,
+        output_dir,
+    )
+
+    print_summary(
+        entries,
+        unique_blob_count,
+        output_dir,
+    )
 
 
 if __name__ == "__main__":

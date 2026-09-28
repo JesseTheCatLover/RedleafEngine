@@ -1,6 +1,6 @@
-build/
-cmake-build-debug/
-cmake-build-release/
+/build/
+/cmake-build-debug/
+/cmake-build-release/
 .cache/
 .DS_Store
 /.idea
@@ -11,3 +11,4 @@ Cargo.lock
 /Assets/
 /SourceAssets/
 /Saved/
+/Distribution/
