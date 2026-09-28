@@ -27,6 +27,7 @@ add_subdirectory(ThirdParty)
 
 # --- Tools ---
 add_subdirectory(Tools/JReflectGen) # (must come BEFORE Engine so JREFLECTGEN_EXE is exported)
+add_subdirectory(Tools/AssetDistribution)
 
 # --- Engine modules ---
 add_subdirectory(Source/Engine)

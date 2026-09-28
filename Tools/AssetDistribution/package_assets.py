@@ -12,7 +12,7 @@ import sys
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parents[1]
 
-CONFIG_PATH = SCRIPT_DIR / "assets.json"
+CONFIG_PATH = SCRIPT_DIR / "configuration.json"
 CMAKE_PATH = PROJECT_ROOT / "CMakeLists.txt"
 
 SOURCE_ASSETS_DIR = PROJECT_ROOT / "SourceAssets"

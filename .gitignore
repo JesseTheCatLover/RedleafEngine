@@ -4,6 +4,7 @@
 .cache/
 .DS_Store
 /.idea
+/.redleaf/
 /cmake-build-release-mingw
 /Tools/JReflectGen/target/
 Cargo.lock
