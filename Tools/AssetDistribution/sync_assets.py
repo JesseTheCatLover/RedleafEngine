@@ -6,36 +6,14 @@ import shutil
 import sys
 
 
-# --- Paths ---
-
-SCRIPT_DIR = Path(__file__).resolve().parent
-
-
 # --- Constants ---
-
-MANIFEST_FORMAT_VERSION = 1
-STATE_FORMAT_VERSION = 1
-PLAN_FORMAT_VERSION = 1
 
 DOWNLOAD_CHUNK_SIZE = 1024 * 1024
 
-
 # --- Output ---
 
-def print_info(message: str) -> None:
-    print(f"[INFO] {message}")
-
-
-def print_download(message: str) -> None:
-    print(f"[DOWNLOAD] {message}")
-
-
-def print_skip(message: str) -> None:
-    print(f"[SKIP] {message}")
-
-
-def print_remove(message: str) -> None:
-    print(f"[REMOVE] {message}")
+def print_status(message: str) -> None:
+    print(message)
 
 
 def print_warning(message: str) -> None:
@@ -198,9 +176,10 @@ def get_install_path(
 def validate_manifest(
         manifest: dict,
         expected_version: str,
+        manifest_format_version: int,
         project_root: Path,
 ) -> None:
-    if manifest.get("format_version") != MANIFEST_FORMAT_VERSION:
+    if manifest.get("format_version") != manifest_format_version:
         print_error(
             "Unsupported asset manifest format version: "
             f"{manifest.get('format_version')}"
@@ -268,9 +247,10 @@ def validate_manifest(
 
 def validate_state(
         state: dict,
+        state_format_version: int,
         project_root: Path,
 ) -> None:
-    if state.get("format_version") != STATE_FORMAT_VERSION:
+    if state.get("format_version") != state_format_version:
         print_error(
             "Unsupported asset state format version: "
             f"{state.get('format_version')}"
@@ -305,8 +285,9 @@ def validate_state(
 def validate_plan(
         plan: dict,
         expected_version: str,
+        plan_format_version: int,
 ) -> None:
-    if plan.get("format_version") != PLAN_FORMAT_VERSION:
+    if plan.get("format_version") != plan_format_version:
         print_error(
             "Unsupported asset plan format version: "
             f"{plan.get('format_version')}"
@@ -341,6 +322,7 @@ def validate_plan(
 
 def load_state(
         state_path: Path,
+        state_format_version: int,
         project_root: Path,
 ) -> dict | None:
     if not state_path.exists():
@@ -349,6 +331,7 @@ def load_state(
     state = load_json(state_path)
     validate_state(
         state,
+        state_format_version,
         project_root,
     )
 
@@ -358,9 +341,10 @@ def load_state(
 def write_state(
         state_path: Path,
         manifest: dict,
+        state_format_version: int,
 ) -> None:
     state = {
-        "format_version": STATE_FORMAT_VERSION,
+        "format_version": state_format_version,
         "package_version": manifest["package_version"],
         "files": manifest["files"],
     }
@@ -407,6 +391,7 @@ def build_download_plan(
         manifest: dict,
         state: dict | None,
         project_root: Path,
+        plan_format_version: int,
 ) -> dict:
     manifest_files = manifest["files"]
 
@@ -423,7 +408,6 @@ def build_download_plan(
                 destination,
                 metadata,
         ):
-            print_skip(package_path)
             continue
 
         sha256 = metadata["sha256"]
@@ -439,7 +423,6 @@ def build_download_plan(
             package_path
         )
 
-        print_download(package_path)
 
     if state is not None:
         state_files = state.get("files", {})
@@ -469,7 +452,7 @@ def build_download_plan(
     )
 
     return {
-        "format_version": PLAN_FORMAT_VERSION,
+        "format_version": plan_format_version,
         "package_version": manifest["package_version"],
         "downloads": downloads,
         "removals": removals,
@@ -482,17 +465,22 @@ def run_plan(
         project_root: Path,
         output_path: Path,
         expected_version: str,
+        manifest_format_version: int,
+        state_format_version: int,
+        plan_format_version: int,
 ) -> None:
     manifest = load_json(manifest_path)
 
     validate_manifest(
         manifest,
         expected_version,
+        manifest_format_version,
         project_root,
     )
 
     state = load_state(
         state_path,
+        state_format_version,
         project_root,
     )
 
@@ -500,6 +488,7 @@ def run_plan(
         manifest,
         state,
         project_root,
+        plan_format_version,
     )
 
     write_json(
@@ -507,26 +496,6 @@ def run_plan(
         plan,
     )
 
-    download_count = len(
-        plan["downloads"]
-    )
-
-    download_file_count = sum(
-        len(entry["files"])
-        for entry in plan["downloads"]
-    )
-
-    removal_count = len(
-        plan["removals"]
-    )
-
-    print()
-    print_info(
-        f"Plan generated: "
-        f"{download_file_count} files need updating, "
-        f"{download_count} unique blobs, "
-        f"{removal_count} removals."
-    )
 
 
 # --- Finalization ---
@@ -672,8 +641,11 @@ def remove_managed_file(
         )
         return False
 
+    print_status(
+        f"  Removing: {package_path}"
+    )
+
     destination.unlink()
-    print_remove(package_path)
 
     return True
 
@@ -690,7 +662,6 @@ def cleanup_cache(cache_dir: Path) -> None:
         return
 
     shutil.rmtree(cache_dir)
-    print_info("Temporary asset cache removed.")
 
 
 def run_finalize(
@@ -700,12 +671,16 @@ def run_finalize(
         cache_dir: Path,
         project_root: Path,
         expected_version: str,
+        manifest_format_version: int,
+        state_format_version: int,
+        plan_format_version: int,
 ) -> None:
     manifest = load_json(manifest_path)
 
     validate_manifest(
         manifest,
         expected_version,
+        manifest_format_version,
         project_root,
     )
 
@@ -714,9 +689,9 @@ def run_finalize(
     validate_plan(
         plan,
         expected_version,
+        plan_format_version,
     )
 
-    print_info("Verifying downloaded blobs...")
 
     for download in plan["downloads"]:
         sha256 = download["sha256"]
@@ -732,8 +707,6 @@ def run_finalize(
             sha256,
             size,
         )
-
-    print_info("Installing assets...")
 
     installed_file_count = 0
 
@@ -760,8 +733,6 @@ def run_finalize(
 
     removed_file_count = 0
 
-    print_info("Cleaning removed managed assets...")
-
     for removal in plan["removals"]:
         if remove_managed_file(
                 project_root,
@@ -772,18 +743,38 @@ def run_finalize(
     write_state(
         state_path,
         manifest,
+        state_format_version,
     )
 
     cleanup_cache(
         cache_dir,
     )
 
-    print()
-    print_info(
-        "Asset synchronization complete: "
-        f"{installed_file_count} installed, "
-        f"{removed_file_count} removed."
-    )
+    if installed_file_count > 0 and removed_file_count > 0:
+        print_status(
+            "Asset distribution: "
+            f"{installed_file_count} installed, "
+            f"{removed_file_count} removed."
+        )
+    elif installed_file_count > 0:
+        print_status(
+            "Asset distribution: "
+            f"{installed_file_count} installed."
+        )
+    elif removed_file_count > 0:
+        print_status(
+            "Asset distribution: "
+            f"{removed_file_count} removed."
+        )
+    else:
+        print_status(
+            "Asset distribution: up to date."
+        )
+
+    if installed_file_count > 0 or removed_file_count > 0:
+        print_status(
+            "Asset distribution: sync complete."
+        )
 
 
 # --- Command line ---
@@ -832,6 +823,24 @@ def create_argument_parser() -> argparse.ArgumentParser:
         required=True,
     )
 
+    plan_parser.add_argument(
+        "--manifest-format-version",
+        type=int,
+        required=True,
+    )
+
+    plan_parser.add_argument(
+        "--state-format-version",
+        type=int,
+        required=True,
+    )
+
+    plan_parser.add_argument(
+        "--plan-format-version",
+        type=int,
+        required=True,
+    )
+
     finalize_parser = subparsers.add_parser(
         "finalize",
         help="Install downloaded assets and update state.",
@@ -872,6 +881,24 @@ def create_argument_parser() -> argparse.ArgumentParser:
         required=True,
     )
 
+    finalize_parser.add_argument(
+        "--manifest-format-version",
+        type=int,
+        required=True,
+    )
+
+    finalize_parser.add_argument(
+        "--state-format-version",
+        type=int,
+        required=True,
+    )
+
+    finalize_parser.add_argument(
+        "--plan-format-version",
+        type=int,
+        required=True,
+    )
+
     return parser
 
 
@@ -890,6 +917,9 @@ def main() -> None:
             project_root=project_root,
             output_path=args.output.resolve(),
             expected_version=args.version,
+            manifest_format_version=args.manifest_format_version,
+            state_format_version=args.state_format_version,
+            plan_format_version=args.plan_format_version,
         )
 
     elif args.command == "finalize":
@@ -900,6 +930,9 @@ def main() -> None:
             cache_dir=args.cache_dir.resolve(),
             project_root=project_root,
             expected_version=args.version,
+            manifest_format_version=args.manifest_format_version,
+            state_format_version=args.state_format_version,
+            plan_format_version=args.plan_format_version,
         )
 
 

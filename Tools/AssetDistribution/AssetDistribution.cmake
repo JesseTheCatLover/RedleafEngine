@@ -44,11 +44,56 @@ set(REDLEAF_ASSET_DISTRIBUTION_MANIFEST_DOWNLOAD
 
 # --- Constants ---
 
-set(REDLEAF_ASSET_DISTRIBUTION_FORMAT_VERSION 1)
 set(REDLEAF_ASSET_MANIFEST_FORMAT_VERSION 1)
+set(REDLEAF_ASSET_STATE_FORMAT_VERSION 1)
+set(REDLEAF_ASSET_PLAN_FORMAT_VERSION 1)
 
 set(REDLEAF_ASSET_DISTRIBUTION_TIMEOUT 120)
 
+
+# --- Output ---
+
+function(redleaf_asset_distribution_print_python_output PYTHON_OUTPUT)
+    if(PYTHON_OUTPUT STREQUAL "")
+        return()
+    endif()
+
+    string(
+            REPLACE
+            "\r\n"
+            "\n"
+            NORMALIZED_OUTPUT
+            "${PYTHON_OUTPUT}"
+    )
+
+    string(
+            REPLACE
+            "\r"
+            "\n"
+            NORMALIZED_OUTPUT
+            "${NORMALIZED_OUTPUT}"
+    )
+
+    string(
+            REGEX REPLACE
+            "\n+$"
+            ""
+            NORMALIZED_OUTPUT
+            "${NORMALIZED_OUTPUT}"
+    )
+
+    string(
+            REPLACE
+            "\n"
+            "\n-- "
+            NORMALIZED_OUTPUT
+            "${NORMALIZED_OUTPUT}"
+    )
+
+    message(STATUS
+            "${NORMALIZED_OUTPUT}"
+    )
+endfunction()
 
 # --- Configuration ---
 
@@ -173,10 +218,6 @@ function(redleaf_asset_distribution_prepare_manifest OUTPUT_PATH)
     )
 
     if(MANIFEST_IS_CURRENT)
-        message(STATUS
-                "  Using local asset manifest."
-        )
-
         set(
                 ${OUTPUT_PATH}
                 "${REDLEAF_ASSET_DISTRIBUTION_MANIFEST}"
@@ -193,6 +234,10 @@ function(redleaf_asset_distribution_prepare_manifest OUTPUT_PATH)
     set(
             MANIFEST_URL
             "https://github.com/${REDLEAF_ASSET_REPOSITORY}/releases/download/assets-${REDLEAF_ASSETS_VERSION}/manifest.json"
+    )
+
+    message(STATUS
+            "Asset distribution: updating manifest..."
     )
 
     message(STATUS
@@ -252,11 +297,24 @@ function(redleaf_asset_distribution_prepare_manifest OUTPUT_PATH)
                 "${REDLEAF_ASSET_DISTRIBUTION_MANIFEST_DOWNLOAD}"
         )
 
+        if(
+                DOWNLOAD_MESSAGE MATCHES "404"
+                OR
+                DOWNLOAD_LOG MATCHES "404"
+        )
+            message(FATAL_ERROR
+                    "Asset distribution version was not found.\n"
+                    "  Repository: ${REDLEAF_ASSET_REPOSITORY}\n"
+                    "  Version:    ${REDLEAF_ASSETS_VERSION}\n"
+                    "  Release:    assets-${REDLEAF_ASSETS_VERSION}"
+            )
+        endif()
+
         message(FATAL_ERROR
                 "Failed to download Redleaf asset manifest.\n"
-                "  URL: ${MANIFEST_URL}\n"
+                "  URL:   ${MANIFEST_URL}\n"
                 "  Error: ${DOWNLOAD_MESSAGE}\n"
-                "  Log: ${DOWNLOAD_LOG}"
+                "  Log:   ${DOWNLOAD_LOG}"
         )
     endif()
 
@@ -300,6 +358,9 @@ function(redleaf_asset_distribution_generate_plan MANIFEST_PATH)
             --project-root "${CMAKE_SOURCE_DIR}"
             --output "${REDLEAF_ASSET_DISTRIBUTION_PLAN}"
             --version "${REDLEAF_ASSETS_VERSION}"
+            --manifest-format-version "${REDLEAF_ASSET_MANIFEST_FORMAT_VERSION}"
+            --state-format-version "${REDLEAF_ASSET_STATE_FORMAT_VERSION}"
+            --plan-format-version "${REDLEAF_ASSET_PLAN_FORMAT_VERSION}"
 
             WORKING_DIRECTORY
             "${CMAKE_SOURCE_DIR}"
@@ -313,12 +374,6 @@ function(redleaf_asset_distribution_generate_plan MANIFEST_PATH)
             ERROR_VARIABLE
             PYTHON_ERROR
     )
-
-    if(NOT PYTHON_OUTPUT STREQUAL "")
-        message(STATUS
-                "${PYTHON_OUTPUT}"
-        )
-    endif()
 
     if(NOT PYTHON_RESULT EQUAL 0)
         message(FATAL_ERROR
@@ -374,6 +429,9 @@ function(redleaf_asset_distribution_download_blobs)
         )
     endif()
 
+
+    # --- Count planned work ---
+
     string(
             JSON
             DOWNLOAD_COUNT
@@ -390,17 +448,79 @@ function(redleaf_asset_distribution_download_blobs)
         )
     endif()
 
+    string(
+            JSON
+            REMOVAL_COUNT
+            ERROR_VARIABLE JSON_ERROR
+            LENGTH
+            "${PLAN_JSON}"
+            removals
+    )
+
+    if(NOT JSON_ERROR STREQUAL "NOTFOUND")
+        message(FATAL_ERROR
+                "Failed to read asset removal plan.\n"
+                "Error: ${JSON_ERROR}"
+        )
+    endif()
+
+    set(
+            SYNC_ASSET_COUNT
+            ${REMOVAL_COUNT}
+    )
+
+    if(DOWNLOAD_COUNT GREATER 0)
+        math(
+                EXPR
+                DOWNLOAD_LAST_INDEX
+                "${DOWNLOAD_COUNT} - 1"
+        )
+
+        foreach(INDEX RANGE 0 ${DOWNLOAD_LAST_INDEX})
+            string(
+                    JSON
+                    DOWNLOAD_FILE_COUNT
+                    ERROR_VARIABLE JSON_ERROR
+                    LENGTH
+                    "${PLAN_JSON}"
+                    downloads
+                    ${INDEX}
+                    files
+            )
+
+            if(NOT JSON_ERROR STREQUAL "NOTFOUND")
+                message(FATAL_ERROR
+                        "Failed to read asset download files."
+                )
+            endif()
+
+            math(
+                    EXPR
+                    SYNC_ASSET_COUNT
+                    "${SYNC_ASSET_COUNT} + ${DOWNLOAD_FILE_COUNT}"
+            )
+        endforeach()
+    endif()
+
+    if(SYNC_ASSET_COUNT EQUAL 0)
+        return()
+    endif()
+
+    message(STATUS
+            "Asset distribution: syncing ${SYNC_ASSET_COUNT} assets..."
+    )
+
+
+    # --- Download blobs ---
+
+    if(DOWNLOAD_COUNT EQUAL 0)
+        return()
+    endif()
+
     file(
             MAKE_DIRECTORY
             "${REDLEAF_ASSET_DISTRIBUTION_CACHE_DIR}"
     )
-
-    if(DOWNLOAD_COUNT EQUAL 0)
-        message(STATUS
-                "  No asset downloads required."
-        )
-        return()
-    endif()
 
     math(
             EXPR
@@ -494,9 +614,6 @@ function(redleaf_asset_distribution_download_blobs)
         endif()
 
         if(CACHE_VALID)
-            message(STATUS
-                    "  Using cached blob: ${SHA256}"
-            )
             continue()
         endif()
 
@@ -504,6 +621,55 @@ function(redleaf_asset_distribution_download_blobs)
                 BLOB_URL
                 "https://github.com/${REDLEAF_ASSET_REPOSITORY}/releases/download/assets-${REDLEAF_ASSETS_VERSION}/blob-${SHA256}"
         )
+
+        string(
+                JSON
+                DOWNLOAD_FILE_COUNT
+                ERROR_VARIABLE JSON_ERROR
+                LENGTH
+                "${PLAN_JSON}"
+                downloads
+                ${INDEX}
+                files
+        )
+
+        if(NOT JSON_ERROR STREQUAL "NOTFOUND")
+            message(FATAL_ERROR
+                    "Failed to read asset download files."
+            )
+        endif()
+
+        if(DOWNLOAD_FILE_COUNT GREATER 0)
+            math(
+                    EXPR
+                    LAST_FILE_INDEX
+                    "${DOWNLOAD_FILE_COUNT} - 1"
+            )
+
+            foreach(FILE_INDEX RANGE 0 ${LAST_FILE_INDEX})
+                string(
+                        JSON
+                        PACKAGE_PATH
+                        ERROR_VARIABLE JSON_ERROR
+                        GET
+                        "${PLAN_JSON}"
+                        downloads
+                        ${INDEX}
+                        files
+                        ${FILE_INDEX}
+                )
+
+                if(NOT JSON_ERROR STREQUAL "NOTFOUND")
+                    message(FATAL_ERROR
+                            "Failed to read asset download path."
+                    )
+                endif()
+
+                message(STATUS
+                        "  Downloading: ${PACKAGE_PATH}"
+                )
+            endforeach()
+        endif()
 
         set(
                 CACHE_TEMPORARY
@@ -513,10 +679,6 @@ function(redleaf_asset_distribution_download_blobs)
         file(
                 REMOVE
                 "${CACHE_TEMPORARY}"
-        )
-
-        message(STATUS
-                "  Downloading blob: ${SHA256}"
         )
 
         file(
@@ -554,10 +716,10 @@ function(redleaf_asset_distribution_download_blobs)
 
             message(FATAL_ERROR
                     "Failed to download Redleaf asset blob.\n"
-                    "  URL:  ${BLOB_URL}\n"
-                    "  Hash: ${SHA256}\n"
+                    "  URL:   ${BLOB_URL}\n"
+                    "  Hash:  ${SHA256}\n"
                     "  Error: ${DOWNLOAD_MESSAGE}\n"
-                    "  Log: ${DOWNLOAD_LOG}"
+                    "  Log:   ${DOWNLOAD_LOG}"
             )
         endif()
 
@@ -596,7 +758,6 @@ function(redleaf_asset_distribution_download_blobs)
     endforeach()
 endfunction()
 
-
 # --- Finalization ---
 
 function(redleaf_asset_distribution_finalize MANIFEST_PATH)
@@ -611,6 +772,9 @@ function(redleaf_asset_distribution_finalize MANIFEST_PATH)
             --cache-dir "${REDLEAF_ASSET_DISTRIBUTION_CACHE_DIR}"
             --project-root "${CMAKE_SOURCE_DIR}"
             --version "${REDLEAF_ASSETS_VERSION}"
+            --manifest-format-version "${REDLEAF_ASSET_MANIFEST_FORMAT_VERSION}"
+            --state-format-version "${REDLEAF_ASSET_STATE_FORMAT_VERSION}"
+            --plan-format-version "${REDLEAF_ASSET_PLAN_FORMAT_VERSION}"
 
             WORKING_DIRECTORY
             "${CMAKE_SOURCE_DIR}"
@@ -625,11 +789,9 @@ function(redleaf_asset_distribution_finalize MANIFEST_PATH)
             PYTHON_ERROR
     )
 
-    if(NOT PYTHON_OUTPUT STREQUAL "")
-        message(STATUS
-                "${PYTHON_OUTPUT}"
-        )
-    endif()
+    redleaf_asset_distribution_print_python_output(
+            "${PYTHON_OUTPUT}"
+    )
 
     if(NOT PYTHON_RESULT EQUAL 0)
         message(FATAL_ERROR
@@ -666,7 +828,7 @@ function(redleaf_sync_asset_distribution)
             RESULT_VARIABLE LOCK_RESULT
     )
 
-    if(NOT LOCK_RESULT EQUAL 0)
+    if(NOT LOCK_RESULT STREQUAL "0")
         message(FATAL_ERROR
                 "Failed to acquire Redleaf asset distribution lock.\n"
                 "  Lock: ${REDLEAF_ASSET_DISTRIBUTION_LOCK}\n"
@@ -693,7 +855,4 @@ function(redleaf_sync_asset_distribution)
             "${REDLEAF_ASSET_DISTRIBUTION_PLAN}"
     )
 
-    message(STATUS
-            "  Asset distribution synchronized."
-    )
 endfunction()
