@@ -4,6 +4,7 @@
 .cache/
 .DS_Store
 __pycache__/
+*.pyc
 /.idea
 /.redleaf/
 /cmake-build-release-mingw
