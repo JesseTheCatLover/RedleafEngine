@@ -92,13 +92,16 @@ public:
      *     - D:\RedleafEngine
      *     - /home/user/MyGame
      *
-     * This function performs lexical normalization using std::filesystem::path.
+     * This function performs lexical normalization using std::filesystem::path
+     * and returns the result using the running platform's native filesystem
+     * representation.
      *
      * The function:
      *
      * - Resolves "." and ".." segments lexically
      * - Reduces redundant separators according to std::filesystem rules
      * - Preserves drive letters, root prefixes, and relative/absolute structure
+     * - Uses the running platform's native path separator
      * - Does NOT resolve symlinks or query the actual filesystem
      * - Does NOT convert paths into virtual engine format
      *
@@ -112,7 +115,8 @@ public:
      * full filesystem canonicalization.
      *
      * @param path Physical filesystem path.
-     * @return Lexically normalized filesystem path string.
+     * @return Lexically normalized physical filesystem path using the running
+     *         platform's native representation.
      */
     static std::string NormalizePhysical(std::string_view path);
 
