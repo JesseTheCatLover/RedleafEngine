@@ -10,6 +10,7 @@ class IPlatformWindow
 public:
     using FResizeCallback = std::function<void(int width, int height)>;
     using FFocusCallback = std::function<void(IPlatformWindow&, bool)>;
+    using FContentScaleCallback = std::function<void(IPlatformWindow&, float xScale, float yScale)>;
 
 public:
     virtual ~IPlatformWindow() = default;
@@ -25,6 +26,15 @@ public:
     virtual void GetWindowSize(int& w, int& h) const = 0;
     virtual void GetFramebufferSize(int& w, int& h) const = 0;
     virtual void GetWindowFrameSize(int& left, int& top, int& right, int& bottom) const = 0;
+
+    // Display scaling
+    virtual void GetContentScale(float& xScale, float& yScale) const
+    {
+        xScale = 1.0f;
+        yScale = 1.0f;
+    }
+
+    virtual void SetContentScaleCallback(FContentScaleCallback callback) {}
 
     [[nodiscard]] virtual int GetWidth() const = 0;
     [[nodiscard]] virtual int GetHeight() const = 0;
