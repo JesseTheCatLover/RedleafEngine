@@ -10,6 +10,7 @@ class GLFWWindow : public IPlatformWindow
 public:
     using FResizeCallback = IPlatformWindow::FResizeCallback;
     using FFocusCallback = IPlatformWindow::FFocusCallback;
+    using FContentScaleCallback = IPlatformWindow::FContentScaleCallback;
 
     using FCloseHandler = std::function<void(GLFWWindow&)>;
 
@@ -22,6 +23,7 @@ private:
     FResizeCallback m_FramebufferResizeCallback;
     FResizeCallback m_WindowResizeCallback;
     FFocusCallback m_FocusCallback;
+    FContentScaleCallback m_ContentScaleCallback;
     FCloseHandler m_CloseHandler;
 
     friend class GLFWSurface;
@@ -49,6 +51,8 @@ public:
     void GetWindowSize(int& w, int& h) const override;
     void GetFramebufferSize(int& w, int& h) const override;
     void GetWindowFrameSize(int &left, int &top, int &right, int &bottom) const override;
+    void GetContentScale(float& xScale, float& yScale) const override;
+    void SetContentScaleCallback(FContentScaleCallback callback) override;
 
     bool ShouldClose() const override;
     void SetShouldClose(bool bShould) override;

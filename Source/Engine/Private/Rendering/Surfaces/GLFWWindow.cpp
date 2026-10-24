@@ -125,6 +125,20 @@ bool GLFWWindow::Initialize()
                 self->m_WindowResizeCallback(width, height);
         });
 
+    // Window content scale callback
+    glfwSetWindowContentScaleCallback(
+        m_Window,
+        [](GLFWwindow* window, float xScale, float yScale)
+        {
+            auto* self = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(window));
+
+            if (!self)
+                return;
+
+            if (self->m_ContentScaleCallback)
+                self->m_ContentScaleCallback(*self, xScale, yScale);
+        });
+
     // Window focus callback
     glfwSetWindowFocusCallback(
     m_Window,
@@ -228,6 +242,23 @@ void GLFWWindow::GetWindowFrameSize(int &left, int &top, int &right, int &bottom
     }
 
     glfwGetWindowFrameSize(m_Window, &left, &top, &right, &bottom);
+}
+
+void GLFWWindow::GetContentScale(float& xScale, float& yScale) const
+{
+    if (!m_Window)
+    {
+        xScale = 1.0f;
+        yScale = 1.0f;
+        return;
+    }
+
+    glfwGetWindowContentScale(m_Window, &xScale, &yScale);
+}
+
+void GLFWWindow::SetContentScaleCallback(FContentScaleCallback callback)
+{
+    m_ContentScaleCallback = std::move(callback);
 }
 
 bool GLFWWindow::ShouldClose() const
