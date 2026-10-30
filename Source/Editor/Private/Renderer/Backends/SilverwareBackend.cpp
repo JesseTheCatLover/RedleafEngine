@@ -11,6 +11,7 @@
 #include "Silverware/Core/Resources/IMountableResourceProvider.h"
 #include "Silverware/Core/Resources/LayeredResourceProvider.h"
 
+#include <cmath>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -22,6 +23,23 @@ namespace
 {
     constexpr char kSilverwareRootDocument[] =
         "silverware:/Backends/RmlUi/Documents/SilverwareRoot.rml";
+
+    constexpr float kDefaultUIScale = 1.0f;
+
+    float GetDisplayScale(const IPlatformWindow& window)
+    {
+        float xScale = 1.0f;
+        float yScale = 1.0f;
+        window.GetContentScale(xScale, yScale);
+
+        if (std::isfinite(xScale) && xScale > 0.0f)
+            return xScale;
+
+        if (std::isfinite(yScale) && yScale > 0.0f)
+            return yScale;
+
+        return 1.0f;
+    }
 
     const char* GetFontRegistrationStatusName(Silverware::EFontRegistrationStatus status)
     {
@@ -157,6 +175,8 @@ bool SilverwareBackend::InitializeRuntime(IPlatformWindow& window)
         height = 1;
     }
 
+    const float displayScale = GetDisplayScale(window);
+
     Silverware::Backends::RmlUi::FRmlUiBackendRuntimeConfig backendConfig;
 
     if (!Silverware::FResourcePath::TryParse(kSilverwareRootDocument, backendConfig.rootDocument))
@@ -187,7 +207,14 @@ bool SilverwareBackend::InitializeRuntime(IPlatformWindow& window)
         return false;
     }
 
-    m_EditorUIContext = m_Host->CreateUIContext("Redleaf.Editor", *m_RenderingContext, width, height, &error);
+    m_EditorUIContext = m_Host->CreateUIContext(
+        "Redleaf.Editor",
+        *m_RenderingContext,
+        width,
+        height,
+        displayScale,
+        kDefaultUIScale,
+        &error);
 
     if (!m_EditorUIContext)
     {
@@ -198,6 +225,12 @@ bool SilverwareBackend::InitializeRuntime(IPlatformWindow& window)
         m_Host.reset();
         return false;
     }
+
+    // std::cout << "[SilverwareBackend]: Editor UI scale: display="
+    //           << m_EditorUIContext->GetDisplayScale()
+    //           << ", ui=" << m_EditorUIContext->GetUIScale()
+    //           << ", effective=" << m_EditorUIContext->GetEffectiveScale()
+    //           << '\n';
 
     return true;
 }

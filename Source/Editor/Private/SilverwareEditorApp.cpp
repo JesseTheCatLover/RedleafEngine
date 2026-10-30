@@ -107,5 +107,5 @@ void SilverwareEditorApp::OnRenderOverlay(float)
     m_SilverwareBackend->Render(*m_Window);
 
     if (m_SilverwareRenderer)
-        m_SilverwareRenderer->RenderViewportUIContext(*m_Window);
+        m_SilverwareRenderer->RenderGameHUDContext(*m_Window);
 }
