@@ -54,6 +54,8 @@ private:
     [[nodiscard]] InputChannelHandle GetChannelHandle(const std::string& name);
 
 public:
+    InputCallbackHandle BindRawInputEvent(FRawInputEventCallback callback);
+    
     InputCallbackHandle BindAction(const std::string& name, EInputEventPhase phase, FBoolActionCallback cb);
 
     InputCallbackHandle BindAxis1D(const std::string& name, EInputEventPhase phase, FAxis1DActionCallback cb);

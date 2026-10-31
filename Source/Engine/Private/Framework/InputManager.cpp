@@ -44,6 +44,15 @@ InputChannelHandle InputManager::GetChannelHandle(const std::string &name)
     m_Cache[name] = handle;
     return handle;
 }
+
+InputCallbackHandle InputManager::BindRawInputEvent(FRawInputEventCallback callback)
+{
+    if (!m_InputSystem)
+        return INVALID_INPUT_CALLBACK;
+
+    return m_InputSystem->RegisterRawInputEventCallback(std::move(callback));
+}
+
 InputCallbackHandle InputManager::BindAction(
     const std::string& name,
     EInputEventPhase phase,

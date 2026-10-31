@@ -76,6 +76,14 @@ private:
     std::unordered_map<std::string, InputChannelHandle> m_NameToHandle;
 
     // ---- Callback storage ----
+    struct FRawInputCallbackEntry
+    {
+        InputCallbackHandle handle{};
+        FRawInputEventCallback callback{};
+    };
+
+    std::vector<FRawInputCallbackEntry> m_RawInputCallbacks;
+
     struct FBoolCallbackEntry
     {
         InputCallbackHandle handle{};
@@ -110,6 +118,9 @@ private:
     InputCallbackHandle m_NextCallbackHandle = 1;
 
     // ---- Callback Registration API ----
+    InputCallbackHandle RegisterRawInputEventCallback(FRawInputEventCallback callback);
+    void DispatchRawInputEvents();
+
     InputCallbackHandle RegisterBoolCallback(
         const std::string& channelName,
         EInputEventPhase phase,

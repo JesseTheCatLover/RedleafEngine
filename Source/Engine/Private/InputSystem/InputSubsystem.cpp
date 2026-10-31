@@ -43,6 +43,7 @@ bool InputSubsystem::Initialize(IInputBackend* backend)
     m_PrevDevicesState.clear();
     m_Channels.clear();
     m_NameToHandle.clear();
+    m_RawInputCallbacks.clear();
     m_BoolCallbacks.clear();
     m_Axis1DCallbacks.clear();
     m_Axis2DCallbacks.clear();
@@ -60,6 +61,7 @@ void InputSubsystem::Shutdown()
     m_PrevDevicesState.clear();
     m_Channels.clear();
     m_NameToHandle.clear();
+    m_RawInputCallbacks.clear();
     m_BoolCallbacks.clear();
     m_Axis1DCallbacks.clear();
     m_Axis2DCallbacks.clear();
@@ -67,6 +69,45 @@ void InputSubsystem::Shutdown()
 }
 
 // ---------- Callback registration ----------
+
+InputCallbackHandle InputSubsystem::RegisterRawInputEventCallback(FRawInputEventCallback callback)
+{
+    if (!callback)
+        return INVALID_INPUT_CALLBACK;
+
+    FRawInputCallbackEntry entry;
+    entry.handle = m_NextCallbackHandle++;
+    entry.callback = std::move(callback);
+
+    InputCallbackHandle handle = entry.handle;
+    m_RawInputCallbacks.push_back(std::move(entry));
+
+    return handle;
+}
+
+void InputSubsystem::DispatchRawInputEvents()
+{
+    for (const FRawInputEvent& event : m_Events)
+    {
+        const auto callbacks = m_RawInputCallbacks;
+
+        for (const FRawInputCallbackEntry& entry : callbacks)
+        {
+            const auto it = std::find_if(
+                m_RawInputCallbacks.begin(),
+                m_RawInputCallbacks.end(),
+                [&entry](const FRawInputCallbackEntry& current)
+                {
+                    return current.handle == entry.handle;
+                });
+
+            if (it == m_RawInputCallbacks.end())
+                continue;
+
+            entry.callback(event);
+        }
+    }
+}
 
 InputCallbackHandle InputSubsystem::RegisterBoolCallback(
     const std::string& channelName,
@@ -149,6 +190,8 @@ void InputSubsystem::UnregisterCallback(InputCallbackHandle handle)
                 [handle](const auto& e) { return e.handle == handle; }),
             vec.end());
     };
+
+    removeByHandle(m_RawInputCallbacks);
 
     removeByHandle(m_BoolCallbacks);
     removeByHandle(m_Axis1DCallbacks);
@@ -259,17 +302,20 @@ void InputSubsystem::Tick(float deltaTime)
     m_Events.clear();
     m_Backend->FetchEvents(m_Events);
 
-    // 2) Save previous device states (for future mapping styles if needed)
+    // 2) Notify raw input observers
+    DispatchRawInputEvents();
+
+    // 3) Save previous device states
     m_PrevDevicesState = m_DevicesState;
 
-    // 3) Apply events -> current device state
+    // 4) Apply events -> current device state
     ProcessEvents();
 
-    // 4) Let mapping style produce channel states
+    // 5) Update logical channels
     if (m_MappingStyle)
         m_MappingStyle->UpdateChannels(deltaTime, m_DevicesState, m_PrevDevicesState, m_ChannelData);
 
-    // 5) Dispatch callbacks
+    // 6) Dispatch logical callbacks
     if (m_MappingStyle)
         DispatchCallbacks();
 }

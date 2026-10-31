@@ -18,6 +18,10 @@ enum class EInputEventPhase : uint8_t
 using InputCallbackHandle = uint32_t;
 static constexpr InputCallbackHandle INVALID_INPUT_CALLBACK = 0;
 
+struct FRawInputEvent;
+
+using FRawInputEventCallback = std::function<void(const FRawInputEvent&)>;
+
 using FBoolActionCallback   = std::function<void(InputChannelHandle, const FActionStateBool&)>;
 using FAxis1DActionCallback = std::function<void(InputChannelHandle, const FActionStateAxis1D&)>;
 using FAxis2DActionCallback = std::function<void(InputChannelHandle, const FActionStateAxis2D&)>;
