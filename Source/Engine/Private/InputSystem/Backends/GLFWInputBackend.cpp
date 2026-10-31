@@ -5,7 +5,54 @@
 #include "GLFWInputMapping.h"
 #include "Rendering/IPlatformWindow.h"
 
-static std::unordered_map<GLFWwindow*, GLFWInputBackend*> s_WindowToBackend;
+namespace
+{
+    std::unordered_map<GLFWwindow*, GLFWInputBackend*> s_WindowToBackend;
+
+    FRawInputModifiers MakeModifiers(int mods)
+    {
+        FRawInputModifiers modifiers{};
+
+        modifiers.shift = (mods & GLFW_MOD_SHIFT) != 0;
+        modifiers.control = (mods & GLFW_MOD_CONTROL) != 0;
+        modifiers.alt = (mods & GLFW_MOD_ALT) != 0;
+        modifiers.super = (mods & GLFW_MOD_SUPER) != 0;
+
+#ifdef GLFW_MOD_CAPS_LOCK
+        modifiers.capsLock = (mods & GLFW_MOD_CAPS_LOCK) != 0;
+#endif
+
+#ifdef GLFW_MOD_NUM_LOCK
+        modifiers.numLock = (mods & GLFW_MOD_NUM_LOCK) != 0;
+#endif
+
+        return modifiers;
+    }
+
+    bool IsGlfwKeyDown(GLFWwindow* window, int key)
+    {
+        return glfwGetKey(window, key) == GLFW_PRESS;
+    }
+
+    FRawInputModifiers GetCurrentModifiers(GLFWwindow* window)
+    {
+        FRawInputModifiers modifiers{};
+
+        modifiers.shift = IsGlfwKeyDown(window, GLFW_KEY_LEFT_SHIFT) ||
+                          IsGlfwKeyDown(window, GLFW_KEY_RIGHT_SHIFT);
+
+        modifiers.control = IsGlfwKeyDown(window, GLFW_KEY_LEFT_CONTROL) ||
+                            IsGlfwKeyDown(window, GLFW_KEY_RIGHT_CONTROL);
+
+        modifiers.alt = IsGlfwKeyDown(window, GLFW_KEY_LEFT_ALT) ||
+                        IsGlfwKeyDown(window, GLFW_KEY_RIGHT_ALT);
+
+        modifiers.super = IsGlfwKeyDown(window, GLFW_KEY_LEFT_SUPER) ||
+                          IsGlfwKeyDown(window, GLFW_KEY_RIGHT_SUPER);
+
+        return modifiers;
+    }
+}
 
 GLFWInputBackend::GLFWInputBackend(GLFWwindow* window)
     : m_Window(window)
@@ -147,32 +194,28 @@ void GLFWInputBackend::OnKey(int key, int scancode, int action, int mods)
         return;
 
     FRawInputEvent ev{};
-    ev.deviceID  = 0; // single keyboard for now
-    ev.code      = static_cast<uint32_t>(phys);
+    ev.deviceID = 0;
+    ev.code = static_cast<uint32_t>(phys);
     ev.timestamp = glfwGetTime();
+    ev.modifiers = MakeModifiers(mods);
 
-    if (action == GLFW_PRESS)
+    if (action == GLFW_PRESS || action == GLFW_REPEAT)
     {
-        ev.type  = ERawInputType::KeyDown;
+        ev.type = ERawInputType::KeyDown;
         ev.value = 1.0f;
+        ev.isRepeat = action == GLFW_REPEAT;
     }
     else if (action == GLFW_RELEASE)
     {
-        ev.type  = ERawInputType::KeyUp;
+        ev.type = ERawInputType::KeyUp;
         ev.value = 0.0f;
     }
-    else if (action == GLFW_REPEAT)
-    {
-        ev.type  = ERawInputType::KeyDown;
-        ev.value = 1.0f;
-    }
     else
-    {
         return;
-    }
 
     m_PendingEvents.push_back(ev);
 }
+
 void GLFWInputBackend::OnMouseButton(int button, int action, int mods)
 {
     EPhysicalInput phys = MapGlfwMouseButtonToEngine(button);
@@ -180,97 +223,88 @@ void GLFWInputBackend::OnMouseButton(int button, int action, int mods)
         return;
 
     FRawInputEvent ev{};
-    ev.deviceID  = 0;
-    ev.code      = static_cast<uint32_t>(phys);
+    ev.deviceID = 0;
+    ev.code = static_cast<uint32_t>(phys);
     ev.timestamp = glfwGetTime();
+    ev.modifiers = MakeModifiers(mods);
+
+    double x, y;
+    glfwGetCursorPos(m_Window, &x, &y);
+
+    ev.positionX = static_cast<float>(x);
+    ev.positionY = static_cast<float>(y);
 
     if (action == GLFW_PRESS)
     {
-        ev.type  = ERawInputType::MouseButtonDown;
+        ev.type = ERawInputType::MouseButtonDown;
         ev.value = 1.0f;
     }
     else if (action == GLFW_RELEASE)
     {
-        ev.type  = ERawInputType::MouseButtonUp;
+        ev.type = ERawInputType::MouseButtonUp;
         ev.value = 0.0f;
     }
     else
-    {
         return;
-    }
 
     m_PendingEvents.push_back(ev);
 }
 
 void GLFWInputBackend::OnScroll(double xoffset, double yoffset)
 {
-    const double time = glfwGetTime();
+    if (xoffset == 0.0 && yoffset == 0.0)
+        return;
 
-    if (yoffset != 0.0)
-    {
-        FRawInputEvent ev{};
-        ev.deviceID  = 0;
-        ev.type      = ERawInputType::MouseWheel;
-        ev.code      = static_cast<uint32_t>(EPhysicalInput::Mouse_WheelY);
-        ev.value     = static_cast<float>(yoffset);
-        ev.timestamp = time;
-        m_PendingEvents.push_back(ev);
-    }
+    FRawInputEvent ev{};
+    ev.deviceID = 0;
+    ev.type = ERawInputType::MouseWheel;
+    ev.timestamp = glfwGetTime();
+    ev.scrollX = static_cast<float>(xoffset);
+    ev.scrollY = static_cast<float>(yoffset);
+    ev.modifiers = GetCurrentModifiers(m_Window);
 
-    if (xoffset != 0.0)
-    {
-        FRawInputEvent ev{};
-        ev.deviceID  = 0;
-        ev.type      = ERawInputType::MouseWheel;
-        ev.code      = static_cast<uint32_t>(EPhysicalInput::Mouse_WheelX);
-        ev.value     = static_cast<float>(xoffset);
-        ev.timestamp = time;
-        m_PendingEvents.push_back(ev);
-    }
+    double x, y;
+    glfwGetCursorPos(m_Window, &x, &y);
+
+    ev.positionX = static_cast<float>(x);
+    ev.positionY = static_cast<float>(y);
+
+    m_PendingEvents.push_back(ev);
 }
 
 void GLFWInputBackend::OnCursorPos(double xpos, double ypos)
 {
-    const double time = glfwGetTime();
-
-    double dx = xpos - m_LastMouseX;
-    double dy = ypos - m_LastMouseY;
+    const double dx = xpos - m_LastMouseX;
+    const double dy = ypos - m_LastMouseY;
 
     m_LastMouseX = xpos;
     m_LastMouseY = ypos;
 
-    if (dx != 0.0)
-    {
-        FRawInputEvent ev{};
-        ev.deviceID  = 0;
-        ev.type      = ERawInputType::MouseMove;
-        ev.code      = static_cast<uint32_t>(EPhysicalInput::Mouse_DeltaX);
-        ev.value     = static_cast<float>(dx);
-        ev.timestamp = time;
-        m_PendingEvents.push_back(ev);
-    }
+    if (dx == 0.0 && dy == 0.0)
+        return;
 
-    if (dy != 0.0)
-    {
-        FRawInputEvent ev{};
-        ev.deviceID  = 0;
-        ev.type      = ERawInputType::MouseMove;
-        ev.code      = static_cast<uint32_t>(EPhysicalInput::Mouse_DeltaY);
-        ev.value     = static_cast<float>(dy);
-        ev.timestamp = time;
-        m_PendingEvents.push_back(ev);
-    }
+    FRawInputEvent ev{};
+    ev.deviceID = 0;
+    ev.type = ERawInputType::MouseMove;
+    ev.timestamp = glfwGetTime();
+
+    ev.positionX = static_cast<float>(xpos);
+    ev.positionY = static_cast<float>(ypos);
+    ev.deltaX = static_cast<float>(dx);
+    ev.deltaY = static_cast<float>(dy);
+    ev.modifiers = GetCurrentModifiers(m_Window);
+
+    m_PendingEvents.push_back(ev);
 }
 
 void GLFWInputBackend::OnChar(unsigned int codepoint)
 {
     FRawInputEvent ev{};
-    ev.deviceID  = 0;
-    ev.type      = ERawInputType::TextInput;
+    ev.deviceID = 0;
+    ev.type = ERawInputType::TextInput;
     ev.timestamp = glfwGetTime();
-
-    ev.code  = static_cast<uint32_t>(codepoint);
-    ev.value = 0.0f;
+    ev.code = static_cast<uint32_t>(codepoint);
+    ev.modifiers = GetCurrentModifiers(m_Window);
 
     m_PendingEvents.push_back(ev);
 }

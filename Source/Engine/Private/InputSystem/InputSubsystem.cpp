@@ -191,19 +191,35 @@ void InputSubsystem::ProcessEvents()
         break;
 
         // ---------- MOUSE (buttons + move + wheel) ----------
-        case ERawInputType::MouseButtonDown:
-        case ERawInputType::MouseButtonUp:
-        case ERawInputType::MouseMove:
-        case ERawInputType::MouseWheel:
-        {
-            FInputDeviceState& mouse =
-                GetOrCreateDevice(m_DevicesState, EInputDeviceType::Mouse, /*index*/ 0);
+            case ERawInputType::MouseButtonDown:
+            case ERawInputType::MouseButtonUp:
+            {
+                FInputDeviceState& mouse =
+                    GetOrCreateDevice(m_DevicesState, EInputDeviceType::Mouse, 0);
 
-            // For buttons, we generally send 0 or 1,
-            // for move/wheel we send per-frame deltas; accumulate.
-            mouse.values[phys] += e.value;
-        }
-        break;
+                mouse.values[phys] = e.value;
+            }
+            break;
+
+            case ERawInputType::MouseMove:
+            {
+                FInputDeviceState& mouse =
+                    GetOrCreateDevice(m_DevicesState, EInputDeviceType::Mouse, 0);
+
+                mouse.values[EPhysicalInput::Mouse_DeltaX] += e.deltaX;
+                mouse.values[EPhysicalInput::Mouse_DeltaY] += e.deltaY;
+            }
+            break;
+
+            case ERawInputType::MouseWheel:
+            {
+                FInputDeviceState& mouse =
+                    GetOrCreateDevice(m_DevicesState, EInputDeviceType::Mouse, 0);
+
+                mouse.values[EPhysicalInput::Mouse_WheelX] += e.scrollX;
+                mouse.values[EPhysicalInput::Mouse_WheelY] += e.scrollY;
+            }
+            break;
 
         // ---------- GAMEPAD ----------
         case ERawInputType::GamepadButtonDown:
