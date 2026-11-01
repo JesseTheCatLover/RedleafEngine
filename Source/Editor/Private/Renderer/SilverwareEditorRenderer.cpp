@@ -512,7 +512,13 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         buttonLayout,
         "Click me!");
 
-    if (!primaryButton)
+    ButtonWidget* secondaryButton = AddButton(
+        *m_ButtonPlayground,
+        "Secondary",
+        buttonLayout,
+        "Click me!");
+
+    if (!primaryButton || !secondaryButton)
         return false;
 
     m_PrimaryButtonClickConnection = primaryButton->OnClick().Connect(
