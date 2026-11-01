@@ -424,10 +424,10 @@ namespace
 
     void SetPadding(Silverware::FWidgetLayout& layout, float top, float right, float bottom, float left)
     {
-        layout.padding.top = Silverware::FLayoutLength::Pixels(top);
-        layout.padding.right = Silverware::FLayoutLength::Pixels(right);
-        layout.padding.bottom = Silverware::FLayoutLength::Pixels(bottom);
-        layout.padding.left = Silverware::FLayoutLength::Pixels(left);
+        layout.padding.top = Silverware::FLayoutLength::Units(top);
+        layout.padding.right = Silverware::FLayoutLength::Units(right);
+        layout.padding.bottom = Silverware::FLayoutLength::Units(bottom);
+        layout.padding.left = Silverware::FLayoutLength::Units(left);
     }
 
     Silverware::FContainerLayout MakeContainerLayout(
@@ -438,7 +438,7 @@ namespace
     {
         Silverware::FContainerLayout layout;
         layout.direction = direction;
-        layout.gap = Silverware::FLayoutLength::Pixels(gap);
+        layout.gap = Silverware::FLayoutLength::Units(gap);
         layout.alignItems = alignItems;
         layout.justifyContent = justifyContent;
         return layout;
@@ -454,7 +454,7 @@ namespace
 
         FWidgetLayout layout;
         layout.width = FLayoutLength::Percent(100.0f);
-        layout.height = FLayoutLength::Pixels(32.0f);
+        layout.height = FLayoutLength::Units(32.0f);
         SetPadding(layout, 0.0f, 8.0f, 0.0f, 8.0f);
 
         ContainerWidget* row = AddContainer(
@@ -703,7 +703,7 @@ bool SilverwareEditorRenderer::BuildEditorLayout()
 
     FWidgetLayout toolbarLayout;
     toolbarLayout.width = FLayoutLength::Percent(100.0f);
-    toolbarLayout.height = FLayoutLength::Pixels(54.0f);
+    toolbarLayout.height = FLayoutLength::Units(54.0f);
     SetPadding(toolbarLayout, 0.0f, 14.0f, 0.0f, 14.0f);
     ContainerWidget* toolbar = AddContainer(
         *m_RootWidget,
@@ -728,7 +728,7 @@ bool SilverwareEditorRenderer::BuildEditorLayout()
 
     FWidgetLayout statusPillLayout;
     statusPillLayout.width = FLayoutLength::Auto();
-    statusPillLayout.height = FLayoutLength::Pixels(30.0f);
+    statusPillLayout.height = FLayoutLength::Units(30.0f);
     SetPadding(statusPillLayout, 0.0f, 10.0f, 0.0f, 10.0f);
     ContainerWidget* statusPill = AddContainer(
         *toolbar,
@@ -803,7 +803,7 @@ bool SilverwareEditorRenderer::BuildEditorLayout()
 
     FWidgetLayout dividerLayout;
     dividerLayout.width = FLayoutLength::Percent(100.0f);
-    dividerLayout.height = FLayoutLength::Pixels(1.0f);
+    dividerLayout.height = FLayoutLength::Units(1.0f);
 
     if (!AddContainer(*sidebar, "Divider", dividerLayout, MakeContainerLayout(ELayoutDirection::Horizontal, 0.0f)))
         return false;
@@ -826,7 +826,7 @@ bool SilverwareEditorRenderer::BuildEditorLayout()
 
     FWidgetLayout imageLayout;
     imageLayout.width = FLayoutLength::Percent(100.0f);
-    imageLayout.height = FLayoutLength::Pixels(300.0f);
+    imageLayout.height = FLayoutLength::Units(300.0f);
     imageLayout.flexGrow = 1.0f;
     viewportImage->SetLayout(imageLayout);
 
@@ -885,7 +885,7 @@ bool SilverwareEditorRenderer::BuildEditorLayout()
 
     FWidgetLayout footerLayout;
     footerLayout.width = FLayoutLength::Percent(100.0f);
-    footerLayout.height = FLayoutLength::Pixels(28.0f);
+    footerLayout.height = FLayoutLength::Units(28.0f);
     SetPadding(footerLayout, 0.0f, 12.0f, 0.0f, 12.0f);
     ContainerWidget* footer = AddContainer(
         *m_RootWidget,
@@ -914,7 +914,7 @@ bool SilverwareEditorRenderer::BuildGameHUDLayout()
         ELayoutDirection::Horizontal, 0.0f, EAlignment::Start, EJustification::Start));
 
     FWidgetLayout cardLayout;
-    cardLayout.width = FLayoutLength::Pixels(300.0f);
+    cardLayout.width = FLayoutLength::Units(300.0f);
     cardLayout.height = FLayoutLength::Auto();
     SetPadding(cardLayout, 13.0f, 13.0f, 13.0f, 13.0f);
 
@@ -929,7 +929,7 @@ bool SilverwareEditorRenderer::BuildGameHUDLayout()
 
     FWidgetLayout headerLayout;
     headerLayout.width = FLayoutLength::Percent(100.0f);
-    headerLayout.height = FLayoutLength::Pixels(26.0f);
+    headerLayout.height = FLayoutLength::Units(26.0f);
     ContainerWidget* header = AddContainer(
         *m_GameHUDCard,
         nullptr,
@@ -943,7 +943,7 @@ bool SilverwareEditorRenderer::BuildGameHUDLayout()
 
     FWidgetLayout dividerLayout;
     dividerLayout.width = FLayoutLength::Percent(100.0f);
-    dividerLayout.height = FLayoutLength::Pixels(1.0f);
+    dividerLayout.height = FLayoutLength::Units(1.0f);
 
     if (!m_GameHUDThemeLabel ||
         !AddContainer(*m_GameHUDCard, "Divider", dividerLayout, MakeContainerLayout(ELayoutDirection::Horizontal, 0.0f)))
@@ -951,7 +951,7 @@ bool SilverwareEditorRenderer::BuildGameHUDLayout()
 
     FWidgetLayout playerCardLayout;
     playerCardLayout.width = FLayoutLength::Percent(100.0f);
-    playerCardLayout.height = FLayoutLength::Pixels(38.0f);
+    playerCardLayout.height = FLayoutLength::Units(38.0f);
     SetPadding(playerCardLayout, 0.0f, 8.0f, 0.0f, 8.0f);
     ContainerWidget* playerCard = AddContainer(
         *m_GameHUDCard,
@@ -976,7 +976,7 @@ bool SilverwareEditorRenderer::BuildGameHUDLayout()
 
     FWidgetLayout meterLayout;
     meterLayout.width = FLayoutLength::Percent(100.0f);
-    meterLayout.height = FLayoutLength::Pixels(8.0f);
+    meterLayout.height = FLayoutLength::Units(8.0f);
     ContainerWidget* healthTrack = AddContainer(
         *m_GameHUDCard,
         "HealthTrack",
@@ -1026,7 +1026,7 @@ bool SilverwareEditorRenderer::BuildGameHUDLayout()
 
     FWidgetLayout footerLayout;
     footerLayout.width = FLayoutLength::Percent(100.0f);
-    footerLayout.height = FLayoutLength::Pixels(20.0f);
+    footerLayout.height = FLayoutLength::Units(20.0f);
     ContainerWidget* footer = AddContainer(
         *m_GameHUDCard,
         nullptr,
@@ -1135,8 +1135,8 @@ void SilverwareEditorRenderer::UpdateGameHUDLayout(int width, int height)
 
     // Keep the HUD visually inside the editor's central viewport panel for this playground.
     auto layout = m_GameHUDCard->GetLayout();
-    layout.margin.left = Silverware::FLayoutLength::Pixels(std::max(12.0f, width * 0.72f - 330.0f));
-    layout.margin.top = Silverware::FLayoutLength::Pixels(72.0f);
+    layout.margin.left = Silverware::FLayoutLength::Units(std::max(12.0f, width * 0.72f - 330.0f));
+    layout.margin.top = Silverware::FLayoutLength::Units(72.0f);
     m_GameHUDCard->SetLayout(layout);
 }
 
