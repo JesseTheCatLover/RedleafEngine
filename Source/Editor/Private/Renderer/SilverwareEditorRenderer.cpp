@@ -453,7 +453,7 @@ namespace
         using namespace Silverware;
 
         FWidgetLayout layout;
-        layout.width = FLayoutLength::Percent(100.0f);
+        layout.width = FLayoutLength::Auto();
         layout.height = FLayoutLength::Units(32.0f);
         SetPadding(layout, 0.0f, 8.0f, 0.0f, 8.0f);
 
@@ -846,7 +846,7 @@ bool SilverwareEditorRenderer::BuildEditorLayout()
         return false;
 
     FWidgetLayout selectedCardLayout;
-    selectedCardLayout.width = FLayoutLength::Percent(100.0f);
+    selectedCardLayout.width = FLayoutLength::Auto();
     selectedCardLayout.height = FLayoutLength::Auto();
     SetPadding(selectedCardLayout, 10.0f, 10.0f, 10.0f, 10.0f);
     ContainerWidget* selectedCard = AddContainer(
@@ -863,7 +863,7 @@ bool SilverwareEditorRenderer::BuildEditorLayout()
         return false;
 
     FWidgetLayout themeCardLayout;
-    themeCardLayout.width = FLayoutLength::Percent(100.0f);
+    themeCardLayout.width = FLayoutLength::Auto();
     themeCardLayout.height = FLayoutLength::Auto();
     SetPadding(themeCardLayout, 10.0f, 10.0f, 10.0f, 10.0f);
     ContainerWidget* themeCard = AddContainer(
