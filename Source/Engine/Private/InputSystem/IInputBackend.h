@@ -3,7 +3,7 @@
 #pragma once
 #include <vector>
 
-#include "FRawInputEvent.h"
+#include "InputSystem/FRawInputEvent.h"
 
 class IPlatformWindow;
 
