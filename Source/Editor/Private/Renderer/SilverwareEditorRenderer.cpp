@@ -14,6 +14,8 @@
 #include <string>
 #include <utility>
 
+#include "Silverware/UI/ButtonWidget.h"
+
 namespace
 {
     using namespace Silverware;
@@ -284,6 +286,37 @@ namespace
         layout.justifyContent = justifyContent;
         return layout;
     }
+
+    Silverware::ButtonWidget* AddButton(
+    Silverware::ContainerWidget& parent,
+    const char* variant,
+    Silverware::FWidgetLayout layout,
+    std::string text)
+    {
+        using namespace Silverware;
+
+        auto button = Silverware::MakeUnique<ButtonWidget>();
+
+        if (variant && *variant)
+            button->SetStyleVariant(variant);
+
+        button->SetLayout(layout);
+        button->SetContainerLayout(MakeContainerLayout(
+            ELayoutDirection::Horizontal, 0.0f,
+            EAlignment::Center, EJustification::Center));
+
+        auto label = Silverware::MakeUnique<TextWidget>(Silverware::TakeUniqueOwnership(text));
+
+        if (!button->AddChild(Silverware::TUniquePtr<CoreWidget>(label.release())))
+            return nullptr;
+
+        ButtonWidget* rawButton = button.get();
+
+        if (!parent.AddChild(Silverware::TUniquePtr<CoreWidget>(button.release())))
+            return nullptr;
+
+        return rawButton;
+    }
 }
 
 SilverwareEditorRenderer::SilverwareEditorRenderer()
@@ -467,6 +500,28 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     if (!m_ButtonPlayground || !m_InteractiveBlockPlayground)
         return false;
 
+    // Button examples
+    FWidgetLayout buttonLayout;
+    buttonLayout.width = FLayoutLength::Units(150.0f);
+    buttonLayout.height = FLayoutLength::Units(38.0f);
+    SetPadding(buttonLayout, 8.0f, 14.0f, 8.0f, 14.0f);
+
+    ButtonWidget* primaryButton = AddButton(
+        *m_ButtonPlayground,
+        "Primary",
+        buttonLayout,
+        "Click me!");
+
+    if (!primaryButton)
+        return false;
+
+    m_PrimaryButtonClickConnection = primaryButton->OnClick().Connect(
+        [](FClickEvent& event)
+        {
+            event.MarkHandled();
+            std::cout << "[SilverwarePlayground]: Primary button clicked.\n";
+        });
+
     // Footer
     FWidgetLayout footerLayout;
     footerLayout.height = FLayoutLength::Units(28.0f);
@@ -508,6 +563,8 @@ void SilverwareEditorRenderer::Shutdown()
         (void)m_Backend->UnregisterTheme(kLightThemeID);
         (void)m_Backend->UnregisterTheme(kBaseThemeID);
     }
+
+    m_PrimaryButtonClickConnection.Disconnect();
 
     m_ButtonPlayground = nullptr;
     m_InteractiveBlockPlayground = nullptr;
