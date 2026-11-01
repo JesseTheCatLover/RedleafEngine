@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "Silverware/UI/ButtonWidget.h"
+#include "Silverware/UI/ImageWidget.h"
 
 namespace
 {
@@ -291,31 +292,48 @@ namespace
     Silverware::ContainerWidget& parent,
     const char* variant,
     Silverware::FWidgetLayout layout,
-    std::string text)
+    Silverware::FContainerLayout contentLayout)
     {
         using namespace Silverware;
 
-        auto button = Silverware::MakeUnique<ButtonWidget>();
+        auto widget = Silverware::MakeUnique<ButtonWidget>();
 
         if (variant && *variant)
-            button->SetStyleVariant(variant);
+            widget->SetStyleVariant(variant);
 
-        button->SetLayout(layout);
-        button->SetContainerLayout(MakeContainerLayout(
-            ELayoutDirection::Horizontal, 0.0f,
-            EAlignment::Center, EJustification::Center));
+        widget->SetLayout(layout);
+        widget->SetContainerLayout(contentLayout);
 
-        auto label = Silverware::MakeUnique<TextWidget>(Silverware::TakeUniqueOwnership(text));
+        ButtonWidget* rawWidget = widget.get();
 
-        if (!button->AddChild(Silverware::TUniquePtr<CoreWidget>(label.release())))
+        if (!parent.AddChild(Silverware::TUniquePtr<CoreWidget>(widget.release())))
             return nullptr;
 
-        ButtonWidget* rawButton = button.get();
+        return rawWidget;
+    }
 
-        if (!parent.AddChild(Silverware::TUniquePtr<CoreWidget>(button.release())))
+    Silverware::ImageWidget* AddImage(
+    Silverware::ContainerWidget& parent,
+    Silverware::FResourcePath source,
+    Silverware::FWidgetLayout layout,
+    Silverware::FImageStyle style)
+    {
+        using namespace Silverware;
+
+        auto widget = Silverware::MakeUnique<ImageWidget>();
+
+        if (!widget->SetSource(Silverware::TakeUniqueOwnership(source)))
             return nullptr;
 
-        return rawButton;
+        widget->SetLayout(layout);
+        widget->SetImageStyle(Silverware::TakeUniqueOwnership(style));
+
+        ImageWidget* rawWidget = widget.get();
+
+        if (!parent.AddChild(Silverware::TUniquePtr<CoreWidget>(widget.release())))
+            return nullptr;
+
+        return rawWidget;
     }
 }
 
@@ -500,32 +518,65 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     if (!m_ButtonPlayground || !m_InteractiveBlockPlayground)
         return false;
 
-    // Button examples
+    // Rich content button
     FWidgetLayout buttonLayout;
-    buttonLayout.width = FLayoutLength::Units(150.0f);
-    buttonLayout.height = FLayoutLength::Units(38.0f);
-    SetPadding(buttonLayout, 8.0f, 14.0f, 8.0f, 14.0f);
+    buttonLayout.width = FLayoutLength::Units(240.0f);
+    buttonLayout.height = FLayoutLength::Units(58.0f);
+    SetPadding(buttonLayout, 8.0f, 8.0f, 8.0f, 8.0f);
 
-    ButtonWidget* primaryButton = AddButton(
+    ButtonWidget* richButton = AddButton(
         *m_ButtonPlayground,
         "Primary",
         buttonLayout,
-        "Click me!");
+        MakeContainerLayout(
+            ELayoutDirection::Horizontal,
+            10.0f,
+            EAlignment::Center,
+            EJustification::Center));
 
-    ButtonWidget* secondaryButton = AddButton(
-        *m_ButtonPlayground,
-        "Secondary",
-        buttonLayout,
-        "Click me!");
-
-    if (!primaryButton || !secondaryButton)
+    if (!richButton)
         return false;
 
-    m_PrimaryButtonClickConnection = primaryButton->OnClick().Connect(
+    // Icon
+    FResourcePath iconSource;
+
+    if (!FResourcePath::TryParse("silverware:/Textures/save02.png", iconSource))
+        return false;
+
+    FWidgetLayout iconLayout;
+    iconLayout.width = FLayoutLength::Units(24.0f);
+    iconLayout.height = FLayoutLength::Units(24.0f);
+
+    FImageStyle iconStyle;
+    iconStyle.fit = EImageFit::Contain;
+
+    if (!AddImage(*richButton, std::move(iconSource), iconLayout, iconStyle))
+        return false;
+
+    // Text content
+    ContainerWidget* textContent = AddContainer(
+        *richButton,
+        nullptr,
+        FWidgetLayout{},
+        MakeContainerLayout(
+            ELayoutDirection::Vertical,
+            2.0f,
+            EAlignment::Start,
+            EJustification::Center));
+
+    if (!textContent)
+        return false;
+
+    if (!AddText(*textContent, "Save Project", "PanelTitle") ||
+        !AddText(*textContent, "Write changes to disk", "Body"))
+        return false;
+
+    // Click event
+    m_PrimaryButtonClickConnection = richButton->OnClick().Connect(
         [](FClickEvent& event)
         {
             event.MarkHandled();
-            std::cout << "[SilverwarePlayground]: Primary button clicked.\n";
+            std::cout << "[SilverwarePlayground]: Rich button clicked.\n";
         });
 
     // Footer
