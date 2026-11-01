@@ -71,7 +71,7 @@ void SilverwareEditorApp::OnProjectInitialized(IPlatformWindow* window, ProjectC
 
     m_SilverwareRenderer = MakeUnique<SilverwareEditorRenderer>();
 
-    if (!m_SilverwareRenderer->Initialize(*m_EditorHost, *m_EditorRuntime, *m_SilverwareBackend, *window))
+    if (!m_SilverwareRenderer->Initialize(*m_SilverwareBackend))
     {
         std::cerr << "[SilverwareEditorApp]: Renderer initialization failed.\n";
         Shutdown();
@@ -105,7 +105,4 @@ void SilverwareEditorApp::OnRenderOverlay(float)
         return;
 
     m_SilverwareBackend->Render(*m_Window);
-
-    if (m_SilverwareRenderer)
-        m_SilverwareRenderer->RenderGameHUDContext(*m_Window);
 }
