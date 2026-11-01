@@ -16,6 +16,7 @@ namespace Silverware
 }
 
 class InputSubsystem;
+class InputManager;
 class ICameraViewSource;
 class CameraEditorTool;
 class EngineContext;
@@ -37,6 +38,7 @@ private:
     VirtualPathMounter& m_VirtualPathMounter;
     ResourceSubsystem& m_Resource;
     InputSubsystem& m_InputSubsystem;
+    InputManager& m_InputManager;
 
     EditorSceneAPI m_SceneAPI;
     EditorViewportAPI m_ViewportAPI;
@@ -64,4 +66,6 @@ public:
     [[nodiscard]] IEditActionSink* GetEditSink() const { return m_EditSink; }
 
     static constexpr uint32_t kEditorPostProfile = 1; // TODO: Legacy: should be moved
+
+    [[nodiscard]] InputManager& GetInputManager() const noexcept { return m_InputManager; }
 };

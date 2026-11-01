@@ -35,9 +35,10 @@ EditorRuntime::EditorRuntime()
     , m_AssetManager(*JEngine::Get().GetAssetManager())
     , m_Resource(*JEngine::Get().GetResourceSubsystem())
     , m_InputSubsystem(*JEngine::Get().GetInputSubsystem())
+    , m_InputManager(*JEngine::Get().GetInputManager())
     , m_SceneAPI(m_Context, m_SceneManager, *JEngine::Get().GetDebugDraw())
     , m_ViewportAPI(m_Context, m_Renderer)
-    , m_SurfaceAPI(m_Context, m_PlatformSurface, *JEngine::Get().GetInputManager())
+    , m_SurfaceAPI(m_Context, m_PlatformSurface, m_InputManager)
     , m_FileAPI(m_Context, m_Resource, m_VirtualPathMounter, m_AssetManager)
 {
     // Editor takes over rendering, so don't render directly to platform surface

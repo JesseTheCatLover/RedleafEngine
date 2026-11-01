@@ -12,6 +12,8 @@
 #include "Silverware/Backend/SilverwareUIContext.h"
 #include "Silverware/Core/Fonts/FontRegistry.h"
 
+class InputManager;
+class SilverwareInputBridge;
 class EditorRuntime;
 class IPlatformWindow;
 
@@ -19,6 +21,7 @@ class SilverwareBackend
 {
 private:
     TUniquePtr<Silverware::IRenderingContext> m_RenderingContext;
+    TUniquePtr<SilverwareInputBridge> m_InputBridge;
 
     // These are populated during initialization and transferred into SilverwareHost.
     TUniquePtr<Silverware::IMountableResourceProvider> m_ResourceProvider;
@@ -28,16 +31,16 @@ private:
     Silverware::SilverwareUIContext* m_EditorUIContext = nullptr;
 
 public:
-    SilverwareBackend() = default;
+    SilverwareBackend();
     ~SilverwareBackend();
 
     SilverwareBackend(const SilverwareBackend&) = delete;
     SilverwareBackend& operator=(const SilverwareBackend&) = delete;
 
-    [[nodiscard]] bool Initialize(EditorRuntime& editorRuntime, IPlatformWindow& window,
+    [[nodiscard]] bool Initialize(EditorRuntime& editorRuntime, InputManager& inputManager, IPlatformWindow& window,
         std::span<const Silverware::FResourcePath> registeredFonts);
 
-    [[nodiscard]] bool Initialize(EditorRuntime& editorRuntime, IPlatformWindow& window);
+    [[nodiscard]] bool Initialize(EditorRuntime& editorRuntime, InputManager& inputManager, IPlatformWindow& window);
 
     void Shutdown();
 

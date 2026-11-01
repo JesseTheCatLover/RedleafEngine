@@ -62,7 +62,7 @@ void SilverwareEditorApp::OnProjectInitialized(IPlatformWindow* window, ProjectC
 
     m_SilverwareBackend = MakeUnique<SilverwareBackend>();
 
-    if (!m_SilverwareBackend->Initialize(*m_EditorRuntime, *window))
+    if (!m_SilverwareBackend->Initialize(*m_EditorRuntime, m_EditorRuntime->GetInputManager(), *window))
     {
         std::cerr << "[SilverwareEditorApp]: Backend initialization failed.\n";
         Shutdown();

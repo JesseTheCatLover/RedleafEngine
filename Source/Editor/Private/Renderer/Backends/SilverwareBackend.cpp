@@ -6,6 +6,7 @@
 #include "Rendering/IPlatformWindow.h"
 
 #include "Silverware/Backends/RmlUi/RmlUiBackendRuntime.h"
+#include "EditorInput/Silverware/SilverwareInputBridge.h"
 #include "Silverware/Core/Resources/FDirectoryResource.h"
 #include "Silverware/Core/Resources/ResourcePath.h"
 #include "Silverware/Core/Resources/IMountableResourceProvider.h"
@@ -61,12 +62,16 @@ namespace
     }
 }
 
+SilverwareBackend::SilverwareBackend()
+{
+}
+
 SilverwareBackend::~SilverwareBackend()
 {
     Shutdown();
 }
 
-bool SilverwareBackend::Initialize(EditorRuntime& editorRuntime, IPlatformWindow& window,
+bool SilverwareBackend::Initialize(EditorRuntime& editorRuntime, InputManager& inputManager, IPlatformWindow& window,
     std::span<const Silverware::FResourcePath> registeredFonts)
 {
     Shutdown();
@@ -124,12 +129,21 @@ bool SilverwareBackend::Initialize(EditorRuntime& editorRuntime, IPlatformWindow
         return false;
     }
 
+    m_InputBridge = MakeUnique<SilverwareInputBridge>();
+
+    if (!m_InputBridge->Initialize(inputManager, *m_EditorUIContext))
+    {
+        std::cerr << "[SilverwareBackend]: Failed to initialize input bridge.\n";
+        Shutdown();
+        return false;
+    }
+
     return true;
 }
 
-bool SilverwareBackend::Initialize(EditorRuntime& editorRuntime, IPlatformWindow& window)
+bool SilverwareBackend::Initialize(EditorRuntime& editorRuntime, InputManager& inputManager, IPlatformWindow& window)
 {
-    return Initialize(editorRuntime, window, std::span<const Silverware::FResourcePath>{});
+    return Initialize(editorRuntime, inputManager, window, std::span<const Silverware::FResourcePath>{});
 }
 
 bool SilverwareBackend::MountResources(EditorRuntime& editorRuntime)
@@ -341,6 +355,9 @@ void SilverwareBackend::Render(IPlatformWindow& window)
 
 void SilverwareBackend::Shutdown()
 {
+    // Disconnect input callbacks before destroying the UI context.
+    m_InputBridge.reset();
+
     // Contexts must be destroyed before the shared backend and resources.
     m_EditorUIContext = nullptr;
 
