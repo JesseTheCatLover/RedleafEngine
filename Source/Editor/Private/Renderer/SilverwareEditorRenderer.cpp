@@ -18,6 +18,45 @@ namespace
 {
     using namespace Silverware;
 
+    constexpr char kBaseThemeID[] = "Redleaf.InkBlue.Base";
+    constexpr char kDarkThemeID[] = "Redleaf.InkBlue.Dark";
+    constexpr char kLightThemeID[] = "Redleaf.InkBlue.Light";
+
+    constexpr char kBaseStylesheetPath[] = "engine:/Editor/Stylesheets/InkBlue.Base.swstyle";
+    constexpr char kDarkStylesheetPath[] = "engine:/Editor/Stylesheets/InkBlue.Dark.swstyle";
+    constexpr char kLightStylesheetPath[] = "engine:/Editor/Stylesheets/InkBlue.Light.swstyle";
+
+    bool LoadPlaygroundStylesheet(
+        Silverware::SilverwareUIContext& context,
+        const char* virtualPath)
+    {
+        Silverware::FResourcePath path;
+
+        if (!Silverware::FResourcePath::TryParse(virtualPath, path))
+        {
+            std::cerr << "[SilverwareRenderer]: Invalid stylesheet path: "
+                      << virtualPath << '\n';
+            return false;
+        }
+
+        const Silverware::FStylesheetLoadResult result = context.LoadStylesheet(path);
+
+        if (!result.Succeeded())
+        {
+            std::cerr << "[SilverwareRenderer]: Failed to load stylesheet "
+                      << virtualPath << ": " << result.message;
+
+            if (result.status == Silverware::EStylesheetLoadStatus::ParseError)
+                std::cerr << " (line " << result.parseError.line
+                          << ", column " << result.parseError.column << ')';
+
+            std::cerr << '\n';
+            return false;
+        }
+
+        return true;
+    }
+
     constexpr char kPlaygroundThemeID[] = "Redleaf.SilverwarePlayground";
 
     FStyleValue Token(const char* tokenID)
@@ -291,6 +330,17 @@ bool SilverwareEditorRenderer::RegisterPlaygroundTheme()
     if (!m_Backend)
         return false;
 
+    Silverware::SilverwareUIContext* context = m_Backend->GetEditorUIContext();
+
+    if (!context)
+        return false;
+
+    // Register the base before its appearance themes.
+    if (!LoadPlaygroundStylesheet(*context, kBaseStylesheetPath) ||
+        !LoadPlaygroundStylesheet(*context, kDarkStylesheetPath) ||
+        !LoadPlaygroundStylesheet(*context, kLightStylesheetPath))
+        return false;
+
     std::string error;
 
     if (!m_Backend->RegisterTheme(MakePlaygroundTheme(), &error))
@@ -299,9 +349,10 @@ bool SilverwareEditorRenderer::RegisterPlaygroundTheme()
         return false;
     }
 
-    if (!m_Backend->SetActiveTheme(kPlaygroundThemeID, &error))
+    if (!m_Backend->SetActiveTheme(kDarkThemeID, &error))
     {
-        std::cerr << "[SilverwareRenderer]: Failed to activate playground theme: " << error << '\n';
+        std::cerr << "[SilverwareRenderer]: Failed to activate InkBlue Dark: "
+                  << error << '\n';
         return false;
     }
 
@@ -452,6 +503,10 @@ void SilverwareEditorRenderer::Shutdown()
     {
         m_Backend->ClearActiveTheme();
         (void)m_Backend->UnregisterTheme(kPlaygroundThemeID);
+        // Unregister children before their shared parent.
+        (void)m_Backend->UnregisterTheme(kDarkThemeID);
+        (void)m_Backend->UnregisterTheme(kLightThemeID);
+        (void)m_Backend->UnregisterTheme(kBaseThemeID);
     }
 
     m_ButtonPlayground = nullptr;
