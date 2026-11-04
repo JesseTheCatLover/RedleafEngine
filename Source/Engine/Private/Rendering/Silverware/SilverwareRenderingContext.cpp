@@ -438,6 +438,53 @@ bool SilverwareRenderingContext::ClearRenderTarget(Silverware::FRenderTargetHand
     return m_RenderDevice.ClearRenderTarget(it->second.Resource, renderClearDesc);
 }
 
+bool SilverwareRenderingContext::CompositeRenderTargets(
+    Silverware::FRenderTargetHandle source,
+    Silverware::FRenderTargetHandle destination,
+    Silverware::ECompositeBlendMode blendMode)
+{
+    if (!source.IsValid())
+        return false;
+
+    const auto sourceIt = m_RenderTargets.find(source.Value);
+
+    if (sourceIt == m_RenderTargets.end())
+        return false;
+
+    RRenderTargetHandle destinationResource{};
+
+    if (destination.IsValid())
+    {
+        const auto destinationIt = m_RenderTargets.find(destination.Value);
+
+        if (destinationIt == m_RenderTargets.end())
+            return false;
+
+        destinationResource = destinationIt->second.Resource;
+    }
+
+    ERenderTargetBlendMode redleafBlendMode{};
+
+    switch (blendMode)
+    {
+        case Silverware::ECompositeBlendMode::Blend:
+            redleafBlendMode = ERenderTargetBlendMode::Blend;
+            break;
+
+        case Silverware::ECompositeBlendMode::Replace:
+            redleafBlendMode = ERenderTargetBlendMode::Replace;
+            break;
+
+        default:
+            return false;
+    }
+
+    return m_RenderDevice.CompositeRenderTargets(
+        sourceIt->second.Resource,
+        destinationResource,
+        redleafBlendMode);
+}
+
 void SilverwareRenderingContext::ClearStencilBuffer(std::uint8_t value)
 {
     m_RenderDevice.ClearStencilBuffer(value);

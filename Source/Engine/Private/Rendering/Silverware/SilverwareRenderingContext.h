@@ -95,6 +95,9 @@ public:
 
     bool ClearRenderTarget(Silverware::FRenderTargetHandle target, const Silverware::FRenderTargetClearDesc &desc) override;
 
+    bool CompositeRenderTargets(Silverware::FRenderTargetHandle source, Silverware::FRenderTargetHandle destination,
+        Silverware::ECompositeBlendMode blendMode) override;
+
     void ClearStencilBuffer(std::uint8_t value) override;
 
     void SetClipMaskStencilState(const Silverware::FClipMaskStencilState &state) override;
