@@ -1061,9 +1061,9 @@ void GLBackend::ClearFramebuffer(const FRenderClearDesc& desc)
 
     previousScissor = glIsEnabled(GL_SCISSOR_TEST);
 
-    // A render-target clear initializes the entire target,
-    // independently of the current drawing scissor region.
-    if (previousScissor)
+    const bool bDisableScissor = previousScissor && !desc.bRespectScissor;
+
+    if (bDisableScissor)
         glDisable(GL_SCISSOR_TEST);
 
     if (desc.bClearColor)

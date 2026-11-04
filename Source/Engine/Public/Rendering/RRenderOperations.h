@@ -15,6 +15,8 @@ struct FRenderClearDesc
     bool bClearStencil = false;
     std::uint8_t stencil = 0;
 
+    bool bRespectScissor = false;
+
     [[nodiscard]] bool IsValid() const noexcept
     {
         return bClearColor || bClearDepth || bClearStencil;

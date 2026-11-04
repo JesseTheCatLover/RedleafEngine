@@ -287,6 +287,7 @@ Silverware::FRenderTargetHandle SilverwareRenderingContext::CreateRenderTarget(c
     FRenderTargetDesc renderTargetDesc{};
     renderTargetDesc.width = desc.width;
     renderTargetDesc.height = desc.height;
+    renderTargetDesc.bHasDepthStencil = desc.bHasDepthStencil;
 
     const RRenderTargetHandle resource = m_RenderDevice.CreateRenderTarget(renderTargetDesc);
 
@@ -425,6 +426,7 @@ bool SilverwareRenderingContext::ClearRenderTarget(Silverware::FRenderTargetHand
 
     FRenderClearDesc renderClearDesc{};
     renderClearDesc.bClearColor = desc.bClearColor;
+    renderClearDesc.bRespectScissor = desc.bRespectScissor;
 
     for (int i = 0; i < 4; ++i)
         renderClearDesc.color[i] = desc.color[i];
