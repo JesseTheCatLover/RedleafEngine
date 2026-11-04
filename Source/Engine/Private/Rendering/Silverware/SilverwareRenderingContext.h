@@ -78,7 +78,7 @@ public:
     bool UpdateExternalTexture(Silverware::FTextureHandle texture, Silverware::FExternalTextureReference externalTexture) override;
 
     void RenderGeometry(Silverware::FGeometryHandle geometry, Silverware::FTextureHandle texture,
-        float translationX, float translationY, bool bWriteColor) override;
+        float translationX, float translationY, const Silverware::FRenderTransform& transform, bool bWriteColor) override;
 
     void EnableScissorRegion(bool bEnable) override;
 

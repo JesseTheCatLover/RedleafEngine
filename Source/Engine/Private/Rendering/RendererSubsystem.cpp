@@ -800,7 +800,7 @@ void RendererSubsystem::EnsureUIGeometryShader()
         layout(location = 2) in vec4 aColour;
 
         uniform vec2 u_Translation;
-        uniform vec2 u_ViewportSize;
+        uniform mat4 u_Transform;
 
         out vec2 vTexCoord;
         out vec4 vColour;
@@ -809,12 +809,7 @@ void RendererSubsystem::EnsureUIGeometryShader()
         {
             vec2 position = aPosition + u_Translation;
 
-            vec2 ndc = vec2(
-                (position.x / u_ViewportSize.x) * 2.0 - 1.0,
-                1.0 - (position.y / u_ViewportSize.y) * 2.0
-            );
-
-            gl_Position = vec4(ndc, 0.0, 1.0);
+            gl_Position = u_Transform * vec4(position, 0.0, 1.0);
 
             vTexCoord = aTexCoord;
             vColour = aColour;
@@ -2250,7 +2245,8 @@ bool RendererSubsystem::CompositeRenderTargets(RRenderTargetHandle source, RRend
 }
 
 void RendererSubsystem::SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHandle texture, float translationX,
-                                                  float translationY, int viewportWidth, int viewportHeight, bool bWriteColor)
+    float translationY, int viewportWidth, int viewportHeight, bool bWriteColor,
+    const float* transform)
 {
     if (!mesh.IsValid() || viewportWidth <= 0 || viewportHeight <= 0)
         return;
@@ -2272,14 +2268,17 @@ void RendererSubsystem::SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHand
     m_Backend->BindShader(m_UIGeometryShader);
 
     const float translation[] = { translationX, translationY };
-    const float viewportSize[] = {
-        static_cast<float>(viewportWidth),
-        static_cast<float>(viewportHeight)
+
+    static constexpr float identityTransform[16] = {
+        1.f, 0.f, 0.f, 0.f,
+        0.f, 1.f, 0.f, 0.f,
+        0.f, 0.f, 1.f, 0.f,
+        0.f, 0.f, 0.f, 1.f
     };
 
     m_Backend->SetUniformVec2(m_UIGeometryShader, "u_Translation", translation);
 
-    m_Backend->SetUniformVec2(m_UIGeometryShader, "u_ViewportSize", viewportSize);
+    m_Backend->SetUniformMat4(m_UIGeometryShader, "u_Transform", transform ? transform : identityTransform);
 
     m_Backend->SetUniformInt(m_UIGeometryShader, "u_Texture", 0);
 

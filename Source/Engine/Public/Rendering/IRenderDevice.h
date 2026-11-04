@@ -75,7 +75,7 @@ public:
 
     virtual void SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHandle texture,
     float translationX, float translationY,
-    int viewportWidth, int viewportHeight, bool bWriteColor = true) = 0;
+    int viewportWidth, int viewportHeight, bool bWriteColor = true, const float* transform = nullptr) = 0;
 
     virtual void EnableScissorRegion(bool bEnable) = 0;
     virtual void SetScissorRegion(int x, int y, int width, int height) = 0;

@@ -204,7 +204,8 @@ public:
         ERenderTargetBlendMode blendMode) override;
 
     void SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHandle texture, float translationX, float translationY,
-                                   int viewportWidth, int viewportHeight, bool bWriteColor) override;
+                                   int viewportWidth, int viewportHeight, bool bWriteColor,
+                                   const float* transform = nullptr) override;
 
     void EnableScissorRegion(bool bEnable) override;
 

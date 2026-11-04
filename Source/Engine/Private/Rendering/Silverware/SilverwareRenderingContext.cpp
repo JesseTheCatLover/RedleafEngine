@@ -235,6 +235,7 @@ void SilverwareRenderingContext::RenderGeometry(
     Silverware::FTextureHandle texture,
     float translationX,
     float translationY,
+    const Silverware::FRenderTransform& transform,
     bool bWriteColor)
 {
     if (!geometry.IsValid() ||
@@ -266,7 +267,8 @@ void SilverwareRenderingContext::RenderGeometry(
         translationY,
         m_ViewportWidth,
         m_ViewportHeight,
-        bWriteColor);
+        bWriteColor,
+        transform.values.data());
 }
 
 void SilverwareRenderingContext::EnableScissorRegion(bool bEnable)
