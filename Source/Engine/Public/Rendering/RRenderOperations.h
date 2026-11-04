@@ -20,3 +20,9 @@ struct FRenderClearDesc
         return bClearColor || bClearDepth || bClearStencil;
     }
 };
+
+enum class ERenderTargetBlendMode : std::uint8_t
+{
+    Blend,
+    Replace
+};

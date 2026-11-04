@@ -56,6 +56,11 @@ public:
 
     virtual bool ClearRenderTarget(RRenderTargetHandle target, const FRenderClearDesc& desc) = 0;
 
+    virtual bool CompositeRenderTargets(
+    RRenderTargetHandle source,
+    RRenderTargetHandle destination,
+    ERenderTargetBlendMode blendMode) = 0;
+
     virtual RShaderHandle CreateShader  (const RShader& data) = 0;
     virtual void DestroyShader (RShaderHandle h) = 0;
 

@@ -159,6 +159,8 @@ private:
     void DrawCustomDepthPass(const RCommandBuffer& cmd, const FMatrix4& viewMat, const FProjectionDesc& projDesc);
     void DrawSceneStencilMaskPass(const RCommandBuffer& cmd, const FMatrix4& viewMat, const FProjectionDesc& projDesc);
 
+    [[nodiscard]] bool DrawFullscreenTexture(RTextureHandle texture);
+
     FCoordAdapter BuildCoordAdapter(const FBackendCoordDesc& d);
 
     void ApplyCamera(const RShaderHandle& shaderToUse, const FMatrix4& viewEngine, const FProjectionDesc& projDesc);
@@ -197,6 +199,9 @@ public:
     bool PopRenderTarget() override;
 
     bool ClearRenderTarget(RRenderTargetHandle target, const FRenderClearDesc &desc) override;
+
+    bool CompositeRenderTargets(RRenderTargetHandle source, RRenderTargetHandle destination,
+        ERenderTargetBlendMode blendMode) override;
 
     void SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHandle texture, float translationX, float translationY,
                                    int viewportWidth, int viewportHeight, bool bWriteColor) override;

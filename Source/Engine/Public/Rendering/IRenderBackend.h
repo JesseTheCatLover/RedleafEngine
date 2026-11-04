@@ -115,6 +115,10 @@ public:
 
     virtual void ClearFramebuffer(const FRenderClearDesc& desc) = 0;
 
+    // Render state preservation
+    virtual bool PushRenderState() = 0;
+    virtual bool PopRenderState() = 0;
+
     virtual void SetStencilState(const FStencilState& state) = 0;
 
     virtual void SetColorWriteMask(bool r, bool g, bool b, bool a) = 0;

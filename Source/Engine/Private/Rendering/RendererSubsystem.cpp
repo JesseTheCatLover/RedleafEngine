@@ -402,6 +402,24 @@ void RendererSubsystem::DrawSceneStencilMaskPass(const RCommandBuffer& cmd,const
     m_Backend->SetStencilState(off);
 }
 
+bool RendererSubsystem::DrawFullscreenTexture(RTextureHandle texture)
+{
+    if (!m_Backend || !texture.IsValid())
+        return false;
+
+    EnsureFullscreenQuad();
+
+    if (!m_FSQuad.IsValid() || !m_LinearCopyShader.IsValid())
+        return false;
+
+    m_Backend->BindShader(m_LinearCopyShader);
+    m_Backend->SetUniformInt(m_LinearCopyShader, "u_Input", 0);
+    m_Backend->BindTexture(texture, 0);
+    m_Backend->SubmitMesh(m_FSQuad, m_LinearCopyShader, FMatrix4::Identity());
+
+    return true;
+}
+
 void RendererSubsystem::BuildDefaultShader()
 {
     if (m_DefaultShader.IsValid())
@@ -2021,6 +2039,214 @@ bool RendererSubsystem::ClearRenderTarget(RRenderTargetHandle target, const FRen
     m_Backend->ClearFramebuffer(desc);
 
     return PopRenderTarget();
+}
+
+bool RendererSubsystem::CompositeRenderTargets(RRenderTargetHandle source, RRenderTargetHandle destination,
+    ERenderTargetBlendMode blendMode)
+{
+    if (!m_Backend || !source.IsValid())
+        return false;
+
+    const auto sourceIt = m_RenderTargets.find(source.id);
+
+    if (sourceIt == m_RenderTargets.end() || !sourceIt->second.color.IsValid())
+        return false;
+
+    if (destination.IsValid() && !m_RenderTargets.contains(destination.id))
+        return false;
+
+    switch (blendMode)
+    {
+        case ERenderTargetBlendMode::Blend:
+        case ERenderTargetBlendMode::Replace:
+            break;
+
+        default:
+            return false;
+    }
+
+    const RTextureHandle sourceTexture = sourceIt->second.color;
+    const int sourceWidth = sourceIt->second.w;
+    const int sourceHeight = sourceIt->second.h;
+
+    if (!m_Backend->PushRenderState())
+        return false;
+
+    RRenderTargetHandle temporaryTarget{};
+
+    // Sampling from a texture while rendering into that same texture
+    // creates a framebuffer feedback loop. Copy it into a temporary target.
+    if (source == destination)
+    {
+        FRenderTargetDesc desc{};
+        desc.width = sourceWidth;
+        desc.height = sourceHeight;
+        desc.colorFormat = ERenderTargetColorFormat::RGBA16F;
+        desc.bHasDepthStencil = false;
+
+        temporaryTarget = CreateRenderTarget(desc);
+
+        if (!temporaryTarget.IsValid())
+        {
+            m_Backend->PopRenderState();
+            return false;
+        }
+    }
+
+    auto compositeInto = [&](RTextureHandle texture,
+                             RRenderTargetHandle target,
+                             ERenderTargetBlendMode mode) -> bool
+    {
+        std::vector<RRenderTargetHandle> suspendedTargets;
+        bool bPushedDestination = false;
+
+        bool bDestinationReady = false;
+
+        if (!target.IsValid())
+        {
+            bDestinationReady = true;
+
+            while (!m_RenderTargetStack.empty())
+            {
+                const RRenderTargetHandle activeTarget = m_RenderTargetStack.back();
+
+                if (!PopRenderTarget())
+                {
+                    bDestinationReady = false;
+                    break;
+                }
+
+                suspendedTargets.push_back(activeTarget);
+            }
+
+            bDestinationReady = bDestinationReady && m_RenderTargetStack.empty();
+        }
+        else
+        {
+            const bool bTargetAlreadyActive =
+                std::find(m_RenderTargetStack.begin(),
+                          m_RenderTargetStack.end(),
+                          target) != m_RenderTargetStack.end();
+
+            if (bTargetAlreadyActive)
+            {
+                bDestinationReady = true;
+
+                while (!m_RenderTargetStack.empty() &&
+                       m_RenderTargetStack.back() != target)
+                {
+                    const RRenderTargetHandle activeTarget = m_RenderTargetStack.back();
+
+                    if (!PopRenderTarget())
+                    {
+                        bDestinationReady = false;
+                        break;
+                    }
+
+                    suspendedTargets.push_back(activeTarget);
+                }
+
+                bDestinationReady = bDestinationReady &&
+                    !m_RenderTargetStack.empty() &&
+                    m_RenderTargetStack.back() == target;
+            }
+            else
+            {
+                bDestinationReady = PushRenderTarget(target);
+                bPushedDestination = bDestinationReady;
+            }
+        }
+
+        auto restoreTargets = [&]() -> bool
+        {
+            bool bRestored = true;
+
+            if (bPushedDestination && !PopRenderTarget())
+                bRestored = false;
+
+            for (auto it = suspendedTargets.rbegin();
+                 it != suspendedTargets.rend(); ++it)
+            {
+                if (!PushRenderTarget(*it))
+                {
+                    bRestored = false;
+                    break;
+                }
+            }
+
+            return bRestored;
+        };
+
+        if (!bDestinationReady)
+        {
+            restoreTargets();
+            return false;
+        }
+
+        m_Backend->SetCullMode(IRenderBackend::ECullMode::None);
+        m_Backend->SetDepthState(
+            false, false, IRenderBackend::ECompareFunc::Always);
+        m_Backend->SetColorWriteMask(true, true, true, true);
+
+        switch (mode)
+        {
+            case ERenderTargetBlendMode::Blend:
+                m_Backend->SetBlendState(
+                    true,
+                    IRenderBackend::EBlendFactor::One,
+                    IRenderBackend::EBlendFactor::OneMinusSrcAlpha);
+                break;
+
+            case ERenderTargetBlendMode::Replace:
+                m_Backend->SetBlendState(
+                    false,
+                    IRenderBackend::EBlendFactor::One,
+                    IRenderBackend::EBlendFactor::Zero);
+                break;
+
+            default:
+                restoreTargets();
+                return false;
+        }
+
+        // Deliberately preserve the active scissor and stencil tests.
+        const bool bDrawSucceeded = DrawFullscreenTexture(texture);
+        const bool bRestoreSucceeded = restoreTargets();
+
+        return bDrawSucceeded && bRestoreSucceeded;
+    };
+
+    bool bSucceeded = false;
+
+    if (temporaryTarget.IsValid())
+    {
+        const RTextureHandle temporaryTexture =
+            GetRenderTargetColorTexture(temporaryTarget);
+
+        if (temporaryTexture.IsValid())
+        {
+            bSucceeded = compositeInto(
+                sourceTexture,
+                temporaryTarget,
+                ERenderTargetBlendMode::Replace);
+
+            if (bSucceeded)
+                bSucceeded = compositeInto(
+                    temporaryTexture,
+                    destination,
+                    blendMode);
+        }
+
+        DestroyRenderTarget(temporaryTarget);
+    }
+    else
+    {
+        bSucceeded = compositeInto(sourceTexture, destination, blendMode);
+    }
+
+    const bool bStateRestored = m_Backend->PopRenderState();
+
+    return bSucceeded && bStateRestored;
 }
 
 void RendererSubsystem::SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHandle texture, float translationX,

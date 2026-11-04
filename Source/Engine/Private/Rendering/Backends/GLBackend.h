@@ -87,6 +87,32 @@ public:
         GLint viewport[4]{};
     };
 
+    struct FRenderState
+    {
+        GLboolean bBlendEnabled = GL_FALSE;
+        GLint blendSrcRGB = GL_ONE;
+        GLint blendDstRGB = GL_ZERO;
+        GLint blendSrcAlpha = GL_ONE;
+        GLint blendDstAlpha = GL_ZERO;
+
+        GLboolean bDepthTestEnabled = GL_FALSE;
+        GLboolean bDepthWriteEnabled = GL_TRUE;
+        GLint depthFunction = GL_LESS;
+
+        GLboolean bCullEnabled = GL_FALSE;
+        GLint cullFaceMode = GL_BACK;
+
+        GLboolean colorWriteMask[4]{
+            GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE
+        };
+
+        GLint currentProgram = 0;
+        GLint vertexArray = 0;
+
+        GLint activeTexture = GL_TEXTURE0;
+        GLint texture2DBindingUnit0 = 0;
+    };
+
     struct FGLLight {
         // std140-friendly: pack intensity into w of position
         GLfloat pos_intensity[4]; // x,y,z,intensity
@@ -99,6 +125,7 @@ private:
     static std::unordered_map<RTextureHandle, FGLTexture> m_Textures;
     static std::unordered_map<RFramebufferHandle, FGLFramebuffer> m_Framebuffers;
     std::vector<FFramebufferState> m_FramebufferStack{};
+    std::vector<FRenderState> m_RenderStateStack{};
     Rint m_NextID = 1;
 
     IPlatformSurface* m_Surface = nullptr;
@@ -170,6 +197,9 @@ public:
     bool PopFramebuffer() override;
 
     void ClearFramebuffer(const FRenderClearDesc &desc) override;
+
+    bool PushRenderState() override;
+    bool PopRenderState() override;
 
     void SetStencilState(const FStencilState &state) override;
 

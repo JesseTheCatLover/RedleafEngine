@@ -229,6 +229,7 @@ bool GLBackend::Initialize(IPlatformSurface* surface)
 void GLBackend::Shutdown()
 {
     m_FramebufferStack.clear();
+    m_RenderStateStack.clear();
 
     // Clean up meshes
     for (auto &[_, mesh] : m_Meshes)
@@ -1108,6 +1109,90 @@ void GLBackend::ClearFramebuffer(const FRenderClearDesc& desc)
 
     if (previousScissor)
         glEnable(GL_SCISSOR_TEST);
+}
+
+bool GLBackend::PushRenderState()
+{
+    FRenderState state{};
+
+    state.bBlendEnabled = glIsEnabled(GL_BLEND);
+
+    glGetIntegerv(GL_BLEND_SRC_RGB, &state.blendSrcRGB);
+    glGetIntegerv(GL_BLEND_DST_RGB, &state.blendDstRGB);
+    glGetIntegerv(GL_BLEND_SRC_ALPHA, &state.blendSrcAlpha);
+    glGetIntegerv(GL_BLEND_DST_ALPHA, &state.blendDstAlpha);
+
+    state.bDepthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
+    glGetBooleanv(GL_DEPTH_WRITEMASK, &state.bDepthWriteEnabled);
+    glGetIntegerv(GL_DEPTH_FUNC, &state.depthFunction);
+
+    state.bCullEnabled = glIsEnabled(GL_CULL_FACE);
+    glGetIntegerv(GL_CULL_FACE_MODE, &state.cullFaceMode);
+
+    glGetBooleanv(GL_COLOR_WRITEMASK, state.colorWriteMask);
+
+    glGetIntegerv(GL_CURRENT_PROGRAM, &state.currentProgram);
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &state.vertexArray);
+
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &state.activeTexture);
+
+    // Our fullscreen rendering operations bind their input on texture unit 0.
+    glActiveTexture(GL_TEXTURE0);
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &state.texture2DBindingUnit0);
+    glActiveTexture(static_cast<GLenum>(state.activeTexture));
+
+    m_RenderStateStack.push_back(state);
+    return true;
+}
+
+bool GLBackend::PopRenderState()
+{
+    if (m_RenderStateStack.empty())
+        return false;
+
+    const FRenderState state = m_RenderStateStack.back();
+    m_RenderStateStack.pop_back();
+
+    if (state.bBlendEnabled)
+        glEnable(GL_BLEND);
+    else
+        glDisable(GL_BLEND);
+
+    glBlendFuncSeparate(
+        static_cast<GLenum>(state.blendSrcRGB),
+        static_cast<GLenum>(state.blendDstRGB),
+        static_cast<GLenum>(state.blendSrcAlpha),
+        static_cast<GLenum>(state.blendDstAlpha));
+
+    if (state.bDepthTestEnabled)
+        glEnable(GL_DEPTH_TEST);
+    else
+        glDisable(GL_DEPTH_TEST);
+
+    glDepthMask(state.bDepthWriteEnabled);
+    glDepthFunc(static_cast<GLenum>(state.depthFunction));
+
+    if (state.bCullEnabled)
+        glEnable(GL_CULL_FACE);
+    else
+        glDisable(GL_CULL_FACE);
+
+    glCullFace(static_cast<GLenum>(state.cullFaceMode));
+
+    glColorMask(
+        state.colorWriteMask[0],
+        state.colorWriteMask[1],
+        state.colorWriteMask[2],
+        state.colorWriteMask[3]);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(state.texture2DBindingUnit0));
+    glActiveTexture(static_cast<GLenum>(state.activeTexture));
+
+    glBindVertexArray(static_cast<GLuint>(state.vertexArray));
+    glUseProgram(static_cast<GLuint>(state.currentProgram));
+
+    return true;
 }
 
 void GLBackend::SetColorWriteMask(bool r, bool g, bool b, bool a)
