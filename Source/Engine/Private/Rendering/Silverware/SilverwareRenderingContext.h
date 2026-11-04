@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 
 #include "Rendering/IRenderDevice.h"
 #include "Silverware/Backend/IRenderingContext.h"
@@ -15,6 +16,22 @@ private:
     {
         RTextureHandle Resource{};
         bool bOwned = false;
+        std::uint64_t renderTargetOwner = 0;
+    };
+
+    struct FRenderTargetEntry
+    {
+        RRenderTargetHandle Resource{};
+        Silverware::FTextureHandle Texture{};
+        int width = 0;
+        int height = 0;
+    };
+
+    struct FRenderTargetStackEntry
+    {
+        std::uint64_t target = 0;
+        int previousViewportWidth = 0;
+        int previousViewportHeight = 0;
     };
 
 private:
@@ -28,6 +45,11 @@ private:
 
     int m_ViewportWidth = 0;
     int m_ViewportHeight = 0;
+
+    std::unordered_map<std::uint64_t, FRenderTargetEntry> m_RenderTargets;
+    std::vector<FRenderTargetStackEntry> m_RenderTargetStack;
+
+    std::uint64_t m_NextRenderTargetHandle = 1;
 
 public:
     explicit SilverwareRenderingContext(IRenderDevice& renderDevice);
@@ -54,13 +76,22 @@ public:
     [[nodiscard]] Silverware::FTextureHandle CreateExternalTexture(Silverware::FExternalTextureReference texture) override;
 
     bool UpdateExternalTexture(Silverware::FTextureHandle texture, Silverware::FExternalTextureReference externalTexture) override;
-
+    
     void RenderGeometry(Silverware::FGeometryHandle geometry, Silverware::FTextureHandle texture,
         float translationX, float translationY, bool bWriteColor) override;
 
     void EnableScissorRegion(bool bEnable) override;
 
     void SetScissorRegion(int x, int y, int width, int height) override;
+
+    Silverware::FRenderTargetHandle CreateRenderTarget(const Silverware::FRenderTargetDesc& desc) override;
+
+    void DestroyRenderTarget(Silverware::FRenderTargetHandle target) override;
+
+    Silverware::FTextureHandle GetRenderTargetTexture(Silverware::FRenderTargetHandle target) override;
+
+    bool PushRenderTarget(Silverware::FRenderTargetHandle target) override;
+    bool PopRenderTarget() override;
 
     void ClearStencilBuffer(std::uint8_t value) override;
 

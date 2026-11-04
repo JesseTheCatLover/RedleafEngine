@@ -30,6 +30,24 @@ std::unordered_map<RFramebufferHandle, GLBackend::FGLFramebuffer> GLBackend::m_F
 // Helpers
 static inline uint32_t NextId(uint32_t &next) { return next++; }
 
+struct FScopedGLFramebufferBindings
+{
+    GLint drawFramebuffer = 0;
+    GLint readFramebuffer = 0;
+
+    FScopedGLFramebufferBindings()
+    {
+        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFramebuffer);
+        glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &readFramebuffer);
+    }
+
+    ~FScopedGLFramebufferBindings()
+    {
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, static_cast<GLuint>(drawFramebuffer));
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, static_cast<GLuint>(readFramebuffer));
+    }
+};
+
 static bool CheckShader(GLuint sh, const char* label)
 {
     GLint ok = GL_FALSE; glGetShaderiv(sh, GL_COMPILE_STATUS, &ok);
@@ -210,6 +228,8 @@ bool GLBackend::Initialize(IPlatformSurface* surface)
 
 void GLBackend::Shutdown()
 {
+    m_FramebufferStack.clear();
+
     // Clean up meshes
     for (auto &[_, mesh] : m_Meshes)
     {
@@ -677,6 +697,8 @@ void GLBackend::DestroyShader(RShaderHandle handle)
 }
 RFramebufferHandle GLBackend::CreateFramebuffer(const RFramebuffer& framebufferData)
 {
+    FScopedGLFramebufferBindings previousBindings;
+
     FGLFramebuffer fb{};
     fb.width   = framebufferData.width;
     fb.height  = framebufferData.height;
@@ -836,8 +858,6 @@ RFramebufferHandle GLBackend::CreateFramebuffer(const RFramebuffer& framebufferD
     if (status != GL_FRAMEBUFFER_COMPLETE)
     {
         std::cerr << "[GLBackend]: FBO incomplete: 0x" << std::hex << status << std::dec << "\n";
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
         // Drop registered handles
         if (fb.colorTexHandle.IsValid()) m_Textures.erase(fb.colorTexHandle);
         if (fb.depthTexHandle.IsValid()) m_Textures.erase(fb.depthTexHandle);
@@ -865,8 +885,6 @@ RFramebufferHandle GLBackend::CreateFramebuffer(const RFramebuffer& framebufferD
         return {};
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
     RFramebufferHandle h{ NextId(m_NextID) };
     m_Framebuffers[h] = fb;
     return h;
@@ -884,6 +902,15 @@ void GLBackend::DestroyFramebuffer(RFramebufferHandle handle)
     if (it == m_Framebuffers.end()) return;
 
     FGLFramebuffer &fb = it->second;
+
+    // A later pop must never try to restore a framebuffer that has been deleted.
+    for (FFramebufferState& state : m_FramebufferStack)
+    {
+        if (state.drawFramebuffer == static_cast<GLint>(fb.fbo))
+            state.drawFramebuffer = 0;
+        if (state.readFramebuffer == static_cast<GLint>(fb.fbo))
+            state.readFramebuffer = 0;
+    }
 
     // Drop engine-visible handles from the registry
     if (fb.colorTexHandle.IsValid()) m_Textures.erase(fb.colorTexHandle);
@@ -936,6 +963,8 @@ void GLBackend::ResolveFramebuffer(RFramebufferHandle src, RFramebufferHandle ds
     auto itD = m_Framebuffers.find(dst);
     if (itS == m_Framebuffers.end() || itD == m_Framebuffers.end()) return;
 
+    FScopedGLFramebufferBindings previousBindings;
+
     const auto& A = itS->second;
     const auto& B = itD->second;
 
@@ -953,7 +982,56 @@ void GLBackend::ResolveFramebuffer(RFramebufferHandle src, RFramebufferHandle ds
         glFilter
     );
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+bool GLBackend::PushFramebuffer(RFramebufferHandle handle)
+{
+    auto it = m_Framebuffers.end();
+    if (handle.IsValid())
+    {
+        it = m_Framebuffers.find(handle);
+        if (it == m_Framebuffers.end())
+            return false;
+    }
+
+    FFramebufferState previousState{};
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &previousState.drawFramebuffer);
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &previousState.readFramebuffer);
+    glGetIntegerv(GL_VIEWPORT, previousState.viewport);
+
+    m_FramebufferStack.push_back(previousState);
+
+    if (it == m_Framebuffers.end())
+    {
+        // An invalid/default handle represents the platform backbuffer.
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        return true;
+    }
+
+    const FGLFramebuffer& framebuffer = it->second;
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
+    glViewport(0, 0, framebuffer.width, framebuffer.height);
+    return true;
+}
+
+bool GLBackend::PopFramebuffer()
+{
+    if (m_FramebufferStack.empty())
+        return false;
+
+    const FFramebufferState previousState = m_FramebufferStack.back();
+    m_FramebufferStack.pop_back();
+
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, static_cast<GLuint>(previousState.drawFramebuffer));
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, static_cast<GLuint>(previousState.readFramebuffer));
+    glViewport(
+        previousState.viewport[0],
+        previousState.viewport[1],
+        previousState.viewport[2],
+        previousState.viewport[3]
+    );
+
+    return true;
 }
 
 void GLBackend::SetColorWriteMask(bool r, bool g, bool b, bool a)
@@ -1359,3 +1437,4 @@ void GLBackend::SubmitMesh(RMeshHandle mesh, RShaderHandle shader, const FMatrix
     }
     glBindVertexArray(0);
 }
+

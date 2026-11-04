@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "FSurfaceDesc.h"
-#include "../../Public/Rendering/IRenderDevice.h"
+#include "Rendering/IRenderDevice.h"
 #include "Rendering/RHandles.h"
 #include "RCommandBuffer.h"
 #include "Rendering/FProjectionDesc.h"
@@ -103,7 +103,7 @@ private:
     };
 
     std::unordered_map<Rint, FMaterialEntry> m_Materials{};
-    Rint m_NextMaterialId = 1;
+    Rint m_NextMaterialID = 1;
 
     struct FTarget
     {
@@ -111,6 +111,7 @@ private:
         RTextureHandle color{};
         RTextureHandle depth{};
         int w = 0, h = 0, samples = 1;
+        bool bHasDepthStencil = false;
     };
 
     // Scene targets
@@ -121,6 +122,10 @@ private:
     FTarget m_Pong{};
     // Custom target
     FTarget m_Custom; // holds: fbo, color(id), depth(customDepth)
+
+    std::unordered_map<Rint, FTarget> m_RenderTargets{};
+    std::vector<RRenderTargetHandle> m_RenderTargetStack{};
+    Rint m_NextRenderTargetId = 1;
 
     // Command buffer for scene-gather stage
     RCommandBuffer m_SceneCmd;
@@ -182,6 +187,14 @@ public:
 
     RTextureHandle CreateTexture(const RTexture &data) override;
     void DestroyTexture(RTextureHandle h) override;
+
+    RRenderTargetHandle CreateRenderTarget(const FRenderTargetDesc& desc) override;
+    void DestroyRenderTarget(RRenderTargetHandle target) override;
+
+    [[nodiscard]] RTextureHandle GetRenderTargetColorTexture(RRenderTargetHandle target) const override;
+
+    bool PushRenderTarget(RRenderTargetHandle target) override;
+    bool PopRenderTarget() override;
 
     void SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHandle texture, float translationX, float translationY,
         int viewportWidth, int viewportHeight, bool bWriteColor) override;

@@ -1,9 +1,14 @@
 //  Copyright 2025-2026 JesseTheCatLover. All Rights Reserved.
 
 #pragma once
-#include <unordered_map>
 #include "Rendering/IRenderBackend.h"
+
+#include <unordered_map>
+#include <unordered_map>
+#include <vector>
+
 #include <glad/gl.h>
+
 #include "Core/Math/FVector2.h"
 #include "Core/Math/FVector3.h"
 
@@ -75,6 +80,13 @@ public:
         void Reset() { *this = FGLFramebuffer{}; }
     };
 
+    struct FFramebufferState
+    {
+        GLint drawFramebuffer = 0;
+        GLint readFramebuffer = 0;
+        GLint viewport[4]{};
+    };
+
     struct FGLLight {
         // std140-friendly: pack intensity into w of position
         GLfloat pos_intensity[4]; // x,y,z,intensity
@@ -86,6 +98,7 @@ private:
     static std::unordered_map<RShaderHandle, FGLShader> m_Shaders;
     static std::unordered_map<RTextureHandle, FGLTexture> m_Textures;
     static std::unordered_map<RFramebufferHandle, FGLFramebuffer> m_Framebuffers;
+    std::vector<FFramebufferState> m_FramebufferStack{};
     Rint m_NextID = 1;
 
     IPlatformSurface* m_Surface = nullptr;
@@ -152,6 +165,9 @@ public:
     void ResolveFramebuffer(RFramebufferHandle src, RFramebufferHandle dst,
                             EResolveMask mask = EResolveMask::Color,
                             EResolveFilter filter = EResolveFilter::Nearest) override;
+
+    bool PushFramebuffer(RFramebufferHandle handle) override;
+    bool PopFramebuffer() override;
 
     void SetStencilState(const FStencilState &state) override;
 

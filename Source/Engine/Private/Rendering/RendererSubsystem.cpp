@@ -8,6 +8,7 @@
 #include "Framework/PostProcessManager.h"
 #include <algorithm>
 #include <unordered_map>
+#include <limits>
 
 #include "RObjects.h"
 #include "Core/EngineContext.h"
@@ -132,6 +133,17 @@ void RendererSubsystem::RenderFrame(const std::vector<FRenderView> &views)
 
 void RendererSubsystem::Shutdown()
 {
+    while (PopRenderTarget())
+    {
+    }
+
+    m_RenderTargetStack.clear();
+
+    for (auto& [_, target] : m_RenderTargets)
+        DestroyTarget(target);
+
+    m_RenderTargets.clear();
+
     m_Backend->Shutdown();
 }
 
@@ -992,30 +1004,36 @@ void RendererSubsystem::DestroyTarget(FTarget &t)
     t = {}; // backend should have invalidated the exported handles
 }
 
-void RendererSubsystem::BuildTarget(FTarget &t, int w, int h, int samples, bool withDepth, bool hdr, bool srgb)
+void RendererSubsystem::BuildTarget(FTarget& t, int w, int h, int samples, bool withDepth, bool hdr, bool srgb)
 {
-    // Describe FBO you want; backend owns attachments
+    // Describe the framebuffer; the backend owns its attachments.
     RFramebuffer fb{};
     fb.width = w;
     fb.height = h;
     fb.samples = std::max(1, samples);
 
     fb.bHasColor = true;
-    fb.bColorAsTexture = true; // we want to sample color
-    fb.bDepthAsTexture = withDepth && samples==1;  // depth as tex only if single-sample
+    fb.bColorAsTexture = true;
+    fb.bDepthAsTexture = withDepth && fb.samples == 1;
 
-    fb.colorMode = hdr ? EColorMode::HDR16F : EColorMode::LDR8;
+    fb.colorMode = srgb ? EColorMode::sRGB8_A8 : hdr ? EColorMode::HDR16F : EColorMode::LDR8;
     fb.depthMode = withDepth ? EDepthMode::D24S8 : EDepthMode::None;
 
     t.fbo = m_Backend->CreateFramebuffer(fb);
+    if (!t.fbo.IsValid())
+        return;
 
-    // Query the engine handles for attached textures (valid only if !MSAA)
+    // Retrieve handles for the framebuffer attachments.
     t.color = m_Backend->GetFramebufferColorTexture(t.fbo);
-    t.depth = m_Backend->GetFramebufferDepthTexture(t.fbo);
 
-    t.w = w; t.h = h; t.samples = fb.samples;
+    if (fb.bDepthAsTexture)
+        t.depth = m_Backend->GetFramebufferDepthTexture(t.fbo);
+
+    t.bHasDepthStencil = withDepth;
+    t.w = w;
+    t.h = h;
+    t.samples = fb.samples;
 }
-
 void RendererSubsystem::BuildCustomTarget(FTarget& t, int w, int h)
 {
     RFramebuffer fb{};
@@ -1029,6 +1047,8 @@ void RendererSubsystem::BuildCustomTarget(FTarget& t, int w, int h)
 
     fb.colorMode = EColorMode::LDR8;
     fb.depthMode = EDepthMode::D24S8; // Custom depth buffer
+
+    t.bHasDepthStencil = true;
 
     t.fbo = m_Backend->CreateFramebuffer(fb);
     t.color = m_Backend->GetFramebufferColorTexture(t.fbo); // CustomID
@@ -1861,8 +1881,126 @@ void RendererSubsystem::DestroyTexture(RTextureHandle h)
     m_Backend->DestroyTexture(h);
 }
 
+RRenderTargetHandle RendererSubsystem::CreateRenderTarget(const FRenderTargetDesc& desc)
+{
+    if (!m_Backend || !desc.IsValid() || m_NextRenderTargetId <= 0)
+        return {};
+
+    bool bHDR = false;
+    bool bSRGB = false;
+
+    switch (desc.colorFormat)
+    {
+        case ERenderTargetColorFormat::RGBA8:
+            break;
+
+        case ERenderTargetColorFormat::RGBA16F:
+            bHDR = true;
+            break;
+
+        case ERenderTargetColorFormat::SRGBA8:
+            bSRGB = true;
+            break;
+
+        default:
+            return {};
+    }
+
+    FTarget target{};
+
+    BuildTarget(target, desc.width, desc.height, 1,
+        desc.bHasDepthStencil, bHDR, bSRGB);
+
+    if (!target.fbo.IsValid() || !target.color.IsValid())
+    {
+        DestroyTarget(target);
+        return {};
+    }
+
+    const Rint id = m_NextRenderTargetId;
+
+    m_NextRenderTargetId = id == std::numeric_limits<Rint>::max()
+        ? 0
+        : id + 1;
+
+    if (!m_RenderTargets.emplace(id, target).second)
+    {
+        DestroyTarget(target);
+        return {};
+    }
+
+    return { id };
+}
+
+void RendererSubsystem::DestroyRenderTarget(RRenderTargetHandle target)
+{
+    if (!target.IsValid())
+        return;
+
+    const auto it = m_RenderTargets.find(target.id);
+
+    if (it == m_RenderTargets.end())
+        return;
+
+    // A target cannot be destroyed while it is active or saved
+    // in the render-target nesting hierarchy.
+    if (std::find(m_RenderTargetStack.begin(), m_RenderTargetStack.end(), target) !=
+        m_RenderTargetStack.end())
+        return;
+
+    DestroyTarget(it->second);
+    m_RenderTargets.erase(it);
+}
+
+RTextureHandle RendererSubsystem::GetRenderTargetColorTexture(
+    RRenderTargetHandle target) const
+{
+    if (!target.IsValid())
+        return RTextureHandle::Invalid();
+
+    const auto it = m_RenderTargets.find(target.id);
+
+    if (it == m_RenderTargets.end())
+        return RTextureHandle::Invalid();
+
+    return it->second.color;
+}
+
+bool RendererSubsystem::PushRenderTarget(RRenderTargetHandle target)
+{
+    if (!target.IsValid() || !m_Backend)
+        return false;
+
+    const auto it = m_RenderTargets.find(target.id);
+
+    if (it == m_RenderTargets.end() || !it->second.fbo.IsValid())
+        return false;
+
+    m_RenderTargetStack.push_back(target);
+
+    if (!m_Backend->PushFramebuffer(it->second.fbo))
+    {
+        m_RenderTargetStack.pop_back();
+        return false;
+    }
+
+    return true;
+}
+
+bool RendererSubsystem::PopRenderTarget()
+{
+    if (!m_Backend || m_RenderTargetStack.empty())
+        return false;
+
+    if (!m_Backend->PopFramebuffer())
+        return false;
+
+    m_RenderTargetStack.pop_back();
+    return true;
+}
+
 void RendererSubsystem::SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHandle texture, float translationX,
-    float translationY, int viewportWidth, int viewportHeight, bool bWriteColor)
+                                                  float translationY, int viewportWidth, int viewportHeight, bool bWriteColor)
 {
     if (!mesh.IsValid() || viewportWidth <= 0 || viewportHeight <= 0)
         return;
@@ -1978,7 +2116,7 @@ void RendererSubsystem::DestroyShader(RShaderHandle h)
 RMaterialHandle RendererSubsystem::CreateMaterial(const FSurfaceDesc &surface)
 {
     // Generate a new handle id
-    const Rint id = m_NextMaterialId++;
+    const Rint id = m_NextMaterialID++;
     m_Materials.emplace(id, FMaterialEntry{ surface });
     return RMaterialHandle{ id };
 }

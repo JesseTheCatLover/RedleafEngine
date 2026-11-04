@@ -109,6 +109,9 @@ public:
                                 EResolveMask mask = EResolveMask::Color,
                                 EResolveFilter filter = EResolveFilter::Nearest) = 0;
 
+    virtual bool PushFramebuffer(RFramebufferHandle handle) = 0;
+    virtual bool PopFramebuffer() = 0;
+
     virtual void SetStencilState(const FStencilState& state) = 0;
 
     virtual void SetColorWriteMask(bool r, bool g, bool b, bool a) = 0;

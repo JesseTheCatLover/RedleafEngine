@@ -15,6 +15,15 @@ SilverwareRenderingContext::SilverwareRenderingContext(IRenderDevice& renderDevi
 
 SilverwareRenderingContext::~SilverwareRenderingContext()
 {
+    while (PopRenderTarget())
+    {
+    }
+
+    for (const auto& [_, target] : m_RenderTargets)
+        m_RenderDevice.DestroyRenderTarget(target.Resource);
+
+    m_RenderTargets.clear();
+
     for (const auto& [_, mesh] : m_Geometries)
         m_RenderDevice.DestroyMesh(mesh);
 
@@ -152,6 +161,15 @@ void SilverwareRenderingContext::DestroyTexture(Silverware::FTextureHandle textu
     if (it == m_Textures.end())
         return;
 
+    if (it->second.renderTargetOwner != 0)
+    {
+        const auto targetIt = m_RenderTargets.find(it->second.renderTargetOwner);
+
+        if (targetIt != m_RenderTargets.end() &&
+            targetIt->second.Texture.Value == texture.Value)
+            targetIt->second.Texture = {};
+    }
+
     if (it->second.bOwned && it->second.Resource.IsValid())
         m_RenderDevice.DestroyTexture(it->second.Resource);
 
@@ -259,6 +277,139 @@ void SilverwareRenderingContext::EnableScissorRegion(bool bEnable)
 void SilverwareRenderingContext::SetScissorRegion(int x, int y, int width, int height)
 {
     m_RenderDevice.SetScissorRegion(x, y, width, height);
+}
+
+Silverware::FRenderTargetHandle SilverwareRenderingContext::CreateRenderTarget(const Silverware::FRenderTargetDesc& desc)
+{
+    if (!desc.IsValid() || m_NextRenderTargetHandle == 0)
+        return {};
+
+    FRenderTargetDesc renderTargetDesc{};
+    renderTargetDesc.width = desc.width;
+    renderTargetDesc.height = desc.height;
+
+    const RRenderTargetHandle resource = m_RenderDevice.CreateRenderTarget(renderTargetDesc);
+
+    if (!resource.IsValid())
+        return {};
+
+    const std::uint64_t id = m_NextRenderTargetHandle++;
+
+    m_RenderTargets.emplace(id, FRenderTargetEntry{
+        resource,
+        {},
+        desc.width,
+        desc.height
+    });
+
+    return {id};
+}
+
+void SilverwareRenderingContext::DestroyRenderTarget(Silverware::FRenderTargetHandle target)
+{
+    if (!target.IsValid())
+        return;
+
+    const auto it = m_RenderTargets.find(target.Value);
+
+    if (it == m_RenderTargets.end())
+        return;
+
+    // A target must not be destroyed while it is in the active
+    // render-target nesting hierarchy.
+    for (const FRenderTargetStackEntry& entry : m_RenderTargetStack)
+        if (entry.target == target.Value)
+            return;
+
+    if (it->second.Texture.IsValid())
+        m_Textures.erase(it->second.Texture.Value);
+
+    m_RenderDevice.DestroyRenderTarget(it->second.Resource);
+    m_RenderTargets.erase(it);
+}
+
+Silverware::FTextureHandle SilverwareRenderingContext::GetRenderTargetTexture(
+    Silverware::FRenderTargetHandle target)
+{
+    if (!target.IsValid())
+        return {};
+
+    auto it = m_RenderTargets.find(target.Value);
+
+    if (it == m_RenderTargets.end())
+        return {};
+
+    // Reuse the existing Silverware alias.
+    if (it->second.Texture.IsValid())
+        return it->second.Texture;
+
+    if (m_NextTextureHandle == 0)
+        return {};
+
+    const RTextureHandle resource =
+        m_RenderDevice.GetRenderTargetColorTexture(it->second.Resource);
+
+    if (!resource.IsValid())
+        return {};
+
+    const std::uint64_t id = m_NextTextureHandle++;
+
+    const Silverware::FTextureHandle texture{id};
+
+    m_Textures.emplace(id, FTextureEntry{
+        resource,
+        false,
+        target.Value
+    });
+
+    it->second.Texture = texture;
+    return texture;
+}
+
+bool SilverwareRenderingContext::PushRenderTarget(Silverware::FRenderTargetHandle target)
+{
+    if (!target.IsValid())
+        return false;
+
+    const auto it = m_RenderTargets.find(target.Value);
+
+    if (it == m_RenderTargets.end())
+        return false;
+
+    m_RenderTargetStack.push_back({
+        target.Value,
+        m_ViewportWidth,
+        m_ViewportHeight
+    });
+
+    if (!m_RenderDevice.PushRenderTarget(it->second.Resource))
+    {
+        m_RenderTargetStack.pop_back();
+        return false;
+    }
+
+    m_ViewportWidth = it->second.width;
+    m_ViewportHeight = it->second.height;
+
+    return true;
+}
+
+bool SilverwareRenderingContext::PopRenderTarget()
+{
+    if (m_RenderTargetStack.empty())
+        return false;
+
+    if (!m_RenderDevice.PopRenderTarget())
+        return false;
+
+    const FRenderTargetStackEntry previous = m_RenderTargetStack.back();
+
+    m_RenderTargetStack.pop_back();
+
+    m_ViewportWidth = previous.previousViewportWidth;
+    m_ViewportHeight = previous.previousViewportHeight;
+
+    return true;
 }
 
 void SilverwareRenderingContext::ClearStencilBuffer(std::uint8_t value)

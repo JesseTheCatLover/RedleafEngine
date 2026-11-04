@@ -4,6 +4,7 @@
 #include <functional>
 #include <cstdint>
 
+#include "RRenderTarget.h"
 #include "Rendering/RHandles.h"
 
 struct FDebugTri;
@@ -42,6 +43,15 @@ public:
 
     virtual RTextureHandle CreateTexture (const RTexture& data) = 0;
     virtual void DestroyTexture(RTextureHandle h) = 0;
+
+    // Render targets
+    virtual RRenderTargetHandle CreateRenderTarget(const FRenderTargetDesc& desc) = 0;
+    virtual void DestroyRenderTarget(RRenderTargetHandle target) = 0;
+
+    [[nodiscard]] virtual RTextureHandle GetRenderTargetColorTexture(RRenderTargetHandle target) const = 0;
+
+    virtual bool PushRenderTarget(RRenderTargetHandle target) = 0;
+    virtual bool PopRenderTarget() = 0;
 
     virtual RShaderHandle CreateShader  (const RShader& data) = 0;
     virtual void DestroyShader (RShaderHandle h) = 0;
