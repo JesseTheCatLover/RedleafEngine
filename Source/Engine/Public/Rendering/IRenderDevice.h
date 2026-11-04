@@ -4,6 +4,7 @@
 #include <functional>
 #include <cstdint>
 
+#include "RRenderOperations.h"
 #include "RRenderTarget.h"
 #include "Rendering/RHandles.h"
 
@@ -52,6 +53,8 @@ public:
 
     virtual bool PushRenderTarget(RRenderTargetHandle target) = 0;
     virtual bool PopRenderTarget() = 0;
+
+    virtual bool ClearRenderTarget(RRenderTargetHandle target, const FRenderClearDesc& desc) = 0;
 
     virtual RShaderHandle CreateShader  (const RShader& data) = 0;
     virtual void DestroyShader (RShaderHandle h) = 0;

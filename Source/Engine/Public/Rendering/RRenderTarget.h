@@ -1,4 +1,4 @@
-// Copyright 2026 JesseTheCatLover. All Rights Reserved.
+// Copyright 2025-2026 JesseTheCatLover. All Rights Reserved.
 
 #pragma once
 

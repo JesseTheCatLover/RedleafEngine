@@ -1999,6 +1999,30 @@ bool RendererSubsystem::PopRenderTarget()
     return true;
 }
 
+bool RendererSubsystem::ClearRenderTarget(RRenderTargetHandle target, const FRenderClearDesc& desc)
+{
+    if (!target.IsValid() || !m_Backend || !desc.IsValid())
+        return false;
+
+    const auto it = m_RenderTargets.find(target.id);
+
+    if (it == m_RenderTargets.end())
+        return false;
+
+    const FTarget& renderTarget = it->second;
+
+    if ((desc.bClearDepth || desc.bClearStencil) &&
+        !renderTarget.bHasDepthStencil)
+        return false;
+
+    if (!PushRenderTarget(target))
+        return false;
+
+    m_Backend->ClearFramebuffer(desc);
+
+    return PopRenderTarget();
+}
+
 void RendererSubsystem::SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHandle texture, float translationX,
                                                   float translationY, int viewportWidth, int viewportHeight, bool bWriteColor)
 {

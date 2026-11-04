@@ -1034,6 +1034,82 @@ bool GLBackend::PopFramebuffer()
     return true;
 }
 
+void GLBackend::ClearFramebuffer(const FRenderClearDesc& desc)
+{
+    if (!desc.IsValid())
+        return;
+
+    GLboolean previousColorMask[4]{};
+    GLboolean previousDepthMask = GL_TRUE;
+    GLboolean previousScissor = GL_FALSE;
+
+    GLint previousStencilFrontMask = 0;
+    GLint previousStencilBackMask = 0;
+
+    if (desc.bClearColor)
+        glGetBooleanv(GL_COLOR_WRITEMASK, previousColorMask);
+
+    if (desc.bClearDepth)
+        glGetBooleanv(GL_DEPTH_WRITEMASK, &previousDepthMask);
+
+    if (desc.bClearStencil)
+    {
+        glGetIntegerv(GL_STENCIL_WRITEMASK, &previousStencilFrontMask);
+        glGetIntegerv(GL_STENCIL_BACK_WRITEMASK, &previousStencilBackMask);
+    }
+
+    previousScissor = glIsEnabled(GL_SCISSOR_TEST);
+
+    // A render-target clear initializes the entire target,
+    // independently of the current drawing scissor region.
+    if (previousScissor)
+        glDisable(GL_SCISSOR_TEST);
+
+    if (desc.bClearColor)
+    {
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+        glClearBufferfv(GL_COLOR, 0, desc.color);
+    }
+
+    if (desc.bClearDepth)
+    {
+        const GLfloat depth = std::clamp(desc.depth, 0.f, 1.f);
+
+        glDepthMask(GL_TRUE);
+        glClearBufferfv(GL_DEPTH, 0, &depth);
+    }
+
+    if (desc.bClearStencil)
+    {
+        const GLint stencil = static_cast<GLint>(desc.stencil);
+
+        glStencilMaskSeparate(GL_FRONT, 0xFF);
+        glStencilMaskSeparate(GL_BACK, 0xFF);
+
+        glClearBufferiv(GL_STENCIL, 0, &stencil);
+    }
+
+    // Restore the graphics state we temporarily changed.
+    if (desc.bClearColor)
+        glColorMask(
+            previousColorMask[0],
+            previousColorMask[1],
+            previousColorMask[2],
+            previousColorMask[3]);
+
+    if (desc.bClearDepth)
+        glDepthMask(previousDepthMask);
+
+    if (desc.bClearStencil)
+    {
+        glStencilMaskSeparate(GL_FRONT, static_cast<GLuint>(previousStencilFrontMask));
+        glStencilMaskSeparate(GL_BACK, static_cast<GLuint>(previousStencilBackMask));
+    }
+
+    if (previousScissor)
+        glEnable(GL_SCISSOR_TEST);
+}
+
 void GLBackend::SetColorWriteMask(bool r, bool g, bool b, bool a)
 {
     glColorMask(r ? GL_TRUE : GL_FALSE,

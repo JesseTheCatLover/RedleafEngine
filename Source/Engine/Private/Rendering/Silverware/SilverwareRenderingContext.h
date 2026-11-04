@@ -76,7 +76,7 @@ public:
     [[nodiscard]] Silverware::FTextureHandle CreateExternalTexture(Silverware::FExternalTextureReference texture) override;
 
     bool UpdateExternalTexture(Silverware::FTextureHandle texture, Silverware::FExternalTextureReference externalTexture) override;
-    
+
     void RenderGeometry(Silverware::FGeometryHandle geometry, Silverware::FTextureHandle texture,
         float translationX, float translationY, bool bWriteColor) override;
 
@@ -92,6 +92,8 @@ public:
 
     bool PushRenderTarget(Silverware::FRenderTargetHandle target) override;
     bool PopRenderTarget() override;
+
+    bool ClearRenderTarget(Silverware::FRenderTargetHandle target, const Silverware::FRenderTargetClearDesc &desc) override;
 
     void ClearStencilBuffer(std::uint8_t value) override;
 

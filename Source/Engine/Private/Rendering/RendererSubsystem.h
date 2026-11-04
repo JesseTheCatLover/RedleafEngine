@@ -196,8 +196,10 @@ public:
     bool PushRenderTarget(RRenderTargetHandle target) override;
     bool PopRenderTarget() override;
 
+    bool ClearRenderTarget(RRenderTargetHandle target, const FRenderClearDesc &desc) override;
+
     void SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHandle texture, float translationX, float translationY,
-        int viewportWidth, int viewportHeight, bool bWriteColor) override;
+                                   int viewportWidth, int viewportHeight, bool bWriteColor) override;
 
     void EnableScissorRegion(bool bEnable) override;
 

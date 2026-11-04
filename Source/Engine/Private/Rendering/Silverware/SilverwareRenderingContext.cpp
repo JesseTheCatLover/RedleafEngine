@@ -412,6 +412,32 @@ bool SilverwareRenderingContext::PopRenderTarget()
     return true;
 }
 
+bool SilverwareRenderingContext::ClearRenderTarget(Silverware::FRenderTargetHandle target,
+    const Silverware::FRenderTargetClearDesc& desc)
+{
+    if (!target.IsValid() || !desc.IsValid())
+        return false;
+
+    const auto it = m_RenderTargets.find(target.Value);
+
+    if (it == m_RenderTargets.end())
+        return false;
+
+    FRenderClearDesc renderClearDesc{};
+    renderClearDesc.bClearColor = desc.bClearColor;
+
+    for (int i = 0; i < 4; ++i)
+        renderClearDesc.color[i] = desc.color[i];
+
+    renderClearDesc.bClearDepth = desc.bClearDepth;
+    renderClearDesc.depth = desc.depth;
+
+    renderClearDesc.bClearStencil = desc.bClearStencil;
+    renderClearDesc.stencil = desc.stencil;
+
+    return m_RenderDevice.ClearRenderTarget(it->second.Resource, renderClearDesc);
+}
+
 void SilverwareRenderingContext::ClearStencilBuffer(std::uint8_t value)
 {
     m_RenderDevice.ClearStencilBuffer(value);

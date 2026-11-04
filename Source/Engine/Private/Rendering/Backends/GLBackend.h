@@ -169,6 +169,8 @@ public:
     bool PushFramebuffer(RFramebufferHandle handle) override;
     bool PopFramebuffer() override;
 
+    void ClearFramebuffer(const FRenderClearDesc &desc) override;
+
     void SetStencilState(const FStencilState &state) override;
 
     void SetColorWriteMask(bool r, bool g, bool b, bool a) override;

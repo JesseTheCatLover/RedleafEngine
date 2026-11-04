@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "RRenderOperations.h"
 #include "Rendering/RHandles.h"
 #include "Core/Math/FVector3.h"
 #include "Rendering/EProjectionType.h"
@@ -111,6 +112,8 @@ public:
 
     virtual bool PushFramebuffer(RFramebufferHandle handle) = 0;
     virtual bool PopFramebuffer() = 0;
+
+    virtual void ClearFramebuffer(const FRenderClearDesc& desc) = 0;
 
     virtual void SetStencilState(const FStencilState& state) = 0;
 
