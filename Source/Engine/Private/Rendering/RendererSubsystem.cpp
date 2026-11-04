@@ -1894,6 +1894,36 @@ void RendererSubsystem::DestroyTexture(RTextureHandle h)
     m_Backend->DestroyTexture(h);
 }
 
+RTextureHandle RendererSubsystem::CreateTextureFromRenderTargetRegion(RRenderTargetHandle source, int x, int y,
+    int width, int height)
+{
+    if (!m_Backend || !source.IsValid() ||
+        x < 0 || y < 0 || width <= 0 || height <= 0)
+        return {};
+
+    const auto it = m_RenderTargets.find(source.id);
+
+    if (it == m_RenderTargets.end())
+        return {};
+
+    const FTarget& target = it->second;
+
+    if (x > target.w || y > target.h ||
+        width > target.w - x ||
+        height > target.h - y)
+        return {};
+
+    // Convert top-left UI coordinates to framebuffer coordinates.
+    const int sourceY = target.h - y - height;
+
+    return m_Backend->CreateTextureFromFramebufferRegion(
+        target.fbo,
+        x,
+        sourceY,
+        width,
+        height);
+}
+
 RRenderTargetHandle RendererSubsystem::CreateRenderTarget(const FRenderTargetDesc& desc)
 {
     if (!m_Backend || !desc.IsValid() || m_NextRenderTargetId <= 0)

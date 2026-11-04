@@ -647,6 +647,112 @@ void GLBackend::BindTexture(RTextureHandle texture, uint32_t slot)
     glBindTexture(it->second.target, it->second.handle);
 }
 
+RTextureHandle GLBackend::CreateTextureFromFramebufferRegion(RFramebufferHandle source, int x, int y, int width, int height)
+{
+    if (!source.IsValid() || x < 0 || y < 0 || width <= 0 || height <= 0 || m_Framebuffers.empty())
+        return {};
+
+    const auto sourceIt = m_Framebuffers.find(source);
+
+    if (sourceIt == m_Framebuffers.end())
+        return {};
+
+    const FGLFramebuffer& sourceFramebuffer = sourceIt->second;
+
+    if (!sourceFramebuffer.fbo ||
+        (!sourceFramebuffer.colorAttachment && !sourceFramebuffer.colorAttachmentMS) ||
+        x > sourceFramebuffer.width ||
+        y > sourceFramebuffer.height ||
+        width > sourceFramebuffer.width - x ||
+        height > sourceFramebuffer.height - y)
+        return {};
+
+    FScopedGLFramebufferBindings previousBindings;
+
+    GLint previousTextureBinding = 0;
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousTextureBinding);
+
+    const GLboolean bScissorWasEnabled = glIsEnabled(GL_SCISSOR_TEST);
+
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+
+    if (!texture)
+        return {};
+
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_RGBA8,
+        width,
+        height,
+        0,
+        GL_RGBA,
+        GL_UNSIGNED_BYTE,
+        nullptr);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    GLuint copyFramebuffer = 0;
+    glGenFramebuffers(1, &copyFramebuffer);
+
+    if (!copyFramebuffer)
+    {
+        glDeleteTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(previousTextureBinding));
+        return {};
+    }
+
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, copyFramebuffer);
+
+    glFramebufferTexture2D(
+        GL_DRAW_FRAMEBUFFER,
+        GL_COLOR_ATTACHMENT0,
+        GL_TEXTURE_2D,
+        texture,
+        0);
+
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+
+    if (glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    {
+        glDeleteFramebuffers(1, &copyFramebuffer);
+        glDeleteTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(previousTextureBinding));
+        return {};
+    }
+
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, sourceFramebuffer.fbo);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+
+    // The active UI scissor must not restrict the destination texture.
+    if (bScissorWasEnabled)
+        glDisable(GL_SCISSOR_TEST);
+
+    // Flip vertically to match the texture-coordinate convention used by RmlUi.
+    glBlitFramebuffer(
+        x, y,
+        x + width, y + height,
+        0, height,
+        width, 0,
+        GL_COLOR_BUFFER_BIT,
+        GL_NEAREST);
+
+    if (bScissorWasEnabled)
+        glEnable(GL_SCISSOR_TEST);
+
+    glDeleteFramebuffers(1, &copyFramebuffer);
+
+    glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(previousTextureBinding));
+
+    return RegisterTextureFromGL(texture, GL_TEXTURE_2D, false);
+}
+
 RTextureHandle GLBackend::RegisterTextureFromGL(GLuint gltex, GLenum target, bool ownedByFBO)
 {
     if (gltex == 0) return RTextureHandle::Invalid();

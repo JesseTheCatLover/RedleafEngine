@@ -73,6 +73,9 @@ public:
 
     void DestroyTexture(Silverware::FTextureHandle texture) override;
 
+    [[nodiscard]] Silverware::FTextureHandle CreateTextureFromRenderTargetRegion(Silverware::FRenderTargetHandle source,
+        int x, int y, int width, int height) override;
+
     [[nodiscard]] Silverware::FTextureHandle CreateExternalTexture(Silverware::FExternalTextureReference texture) override;
 
     bool UpdateExternalTexture(Silverware::FTextureHandle texture, Silverware::FExternalTextureReference externalTexture) override;

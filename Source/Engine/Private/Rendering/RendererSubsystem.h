@@ -190,6 +190,9 @@ public:
     RTextureHandle CreateTexture(const RTexture &data) override;
     void DestroyTexture(RTextureHandle h) override;
 
+    [[nodiscard]] RTextureHandle CreateTextureFromRenderTargetRegion(RRenderTargetHandle source, int x, int y,
+        int width, int height) override;
+
     RRenderTargetHandle CreateRenderTarget(const FRenderTargetDesc& desc) override;
     void DestroyRenderTarget(RRenderTargetHandle target) override;
 

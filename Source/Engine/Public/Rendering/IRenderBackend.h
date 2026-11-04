@@ -98,6 +98,14 @@ public:
     virtual void DestroyTexture(RTextureHandle handle) = 0;
     virtual void BindTexture(RTextureHandle texture, uint32_t slot) = 0;
 
+    // Source coordinates use the framebuffer's bottom-left origin.
+    [[nodiscard]] virtual RTextureHandle CreateTextureFromFramebufferRegion(
+        RFramebufferHandle source,
+        int x,
+        int y,
+        int width,
+        int height) = 0;
+
     virtual RShaderHandle CreateShader(const RShader& shaderData) = 0;
     virtual void DestroyShader(RShaderHandle handle) = 0;
     virtual void BindShader(RShaderHandle shader) = 0;

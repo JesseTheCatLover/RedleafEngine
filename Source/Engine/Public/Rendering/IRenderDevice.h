@@ -45,6 +45,13 @@ public:
     virtual RTextureHandle CreateTexture (const RTexture& data) = 0;
     virtual void DestroyTexture(RTextureHandle h) = 0;
 
+    [[nodiscard]] virtual RTextureHandle CreateTextureFromRenderTargetRegion(
+    RRenderTargetHandle source,
+    int x,
+    int y,
+    int width,
+    int height) = 0;
+
     // Render targets
     virtual RRenderTargetHandle CreateRenderTarget(const FRenderTargetDesc& desc) = 0;
     virtual void DestroyRenderTarget(RRenderTargetHandle target) = 0;

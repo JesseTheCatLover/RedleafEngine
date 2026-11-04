@@ -181,6 +181,9 @@ public:
     void DestroyTexture(RTextureHandle handle) override;
     void BindTexture(RTextureHandle texture, uint32_t slot) override;
 
+    [[nodiscard]] RTextureHandle CreateTextureFromFramebufferRegion(RFramebufferHandle source, int x, int y, int width,
+        int height) override;
+
     RShaderHandle CreateShader(const RShader& shaderData) override;
     void DestroyShader(RShaderHandle handle) override;
     void BindShader(RShaderHandle shader) override;

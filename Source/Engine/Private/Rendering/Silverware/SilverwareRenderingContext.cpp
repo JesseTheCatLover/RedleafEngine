@@ -176,6 +176,39 @@ void SilverwareRenderingContext::DestroyTexture(Silverware::FTextureHandle textu
     m_Textures.erase(it);
 }
 
+Silverware::FTextureHandle SilverwareRenderingContext::CreateTextureFromRenderTargetRegion(
+    Silverware::FRenderTargetHandle source, int x, int y, int width, int height)
+{
+    if (!source.IsValid() || x < 0 || y < 0 ||
+        width <= 0 || height <= 0 || m_NextTextureHandle == 0)
+        return {};
+
+    const auto sourceIt = m_RenderTargets.find(source.Value);
+
+    if (sourceIt == m_RenderTargets.end())
+        return {};
+
+    const FRenderTargetEntry& target = sourceIt->second;
+
+    if (x > target.width || y > target.height ||
+        width > target.width - x ||
+        height > target.height - y)
+        return {};
+
+    const RTextureHandle resource =
+        m_RenderDevice.CreateTextureFromRenderTargetRegion(
+            target.Resource, x, y, width, height);
+
+    if (!resource.IsValid())
+        return {};
+
+    const std::uint64_t id = m_NextTextureHandle++;
+
+    m_Textures.emplace(id, FTextureEntry{resource, true});
+
+    return {id};
+}
+
 Silverware::FTextureHandle SilverwareRenderingContext::CreateExternalTexture(
     Silverware::FExternalTextureReference texture)
 {
