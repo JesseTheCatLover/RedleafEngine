@@ -9,6 +9,7 @@
 #include "Rendering/RHandles.h"
 #include "RCommandBuffer.h"
 #include "Rendering/FProjectionDesc.h"
+#include "Rendering/IRenderTargetProcessor.h"
 
 struct FProjectionDesc;
 struct FDebugWorldVertex;
@@ -37,7 +38,7 @@ class PostProcessManager;
 struct RRenderProxy;
 class IRenderBackend;
 
-class RendererSubsystem : public IRenderDevice
+class RendererSubsystem : public IRenderDevice, public IRenderTargetProcessor
 {
 private:
     friend class JEngine;
@@ -205,6 +206,12 @@ public:
 
     bool CompositeRenderTargets(RRenderTargetHandle source, RRenderTargetHandle destination,
         ERenderTargetBlendMode blendMode) override;
+
+    [[nodiscard]] bool ApplyFilter(
+    RRenderTargetHandle source,
+    RRenderTargetHandle output,
+    const FRenderTargetFilterDesc& filter,
+    const FRenderTargetRegion& region) override;
 
     void SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHandle texture, float translationX, float translationY,
                                    int viewportWidth, int viewportHeight, bool bWriteColor,

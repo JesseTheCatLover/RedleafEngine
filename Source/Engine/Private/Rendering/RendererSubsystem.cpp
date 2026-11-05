@@ -2274,9 +2274,15 @@ bool RendererSubsystem::CompositeRenderTargets(RRenderTargetHandle source, RRend
     return bSucceeded && bStateRestored;
 }
 
+bool RendererSubsystem::ApplyFilter(RRenderTargetHandle source, RRenderTargetHandle output,
+    const FRenderTargetFilterDesc &filter, const FRenderTargetRegion &region)
+{
+    return false;
+}
+
 void RendererSubsystem::SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHandle texture, float translationX,
-    float translationY, int viewportWidth, int viewportHeight, bool bWriteColor,
-    const float* transform)
+                                                  float translationY, int viewportWidth, int viewportHeight, bool bWriteColor,
+                                                  const float* transform)
 {
     if (!mesh.IsValid() || viewportWidth <= 0 || viewportHeight <= 0)
         return;
