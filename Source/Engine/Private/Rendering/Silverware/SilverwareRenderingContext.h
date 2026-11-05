@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "Rendering/IRenderDevice.h"
+#include "Rendering/IRenderTargetProcessor.h"
 #include "Silverware/Backend/IRenderingContext.h"
 
 class SilverwareRenderingContext final : public Silverware::IRenderingContext
@@ -36,6 +37,7 @@ private:
 
 private:
     IRenderDevice& m_RenderDevice;
+    IRenderTargetProcessor& m_RenderTargetProcessor;
 
     std::unordered_map<std::uint64_t, RMeshHandle> m_Geometries;
     std::unordered_map<std::uint64_t, FTextureEntry> m_Textures;
@@ -52,7 +54,7 @@ private:
     std::uint64_t m_NextRenderTargetHandle = 1;
 
 public:
-    explicit SilverwareRenderingContext(IRenderDevice& renderDevice);
+    explicit SilverwareRenderingContext(IRenderDevice& renderDevice, IRenderTargetProcessor& renderTargetProcessor);
     ~SilverwareRenderingContext() override;
 
     SilverwareRenderingContext(const SilverwareRenderingContext&) = delete;
@@ -100,6 +102,9 @@ public:
 
     bool CompositeRenderTargets(Silverware::FRenderTargetHandle source, Silverware::FRenderTargetHandle destination,
         Silverware::ECompositeBlendMode blendMode) override;
+
+    bool ApplyFilter(Silverware::FRenderTargetHandle source, Silverware::FRenderTargetHandle output,
+        const Silverware::FRenderTargetFilterDesc &filter, const Silverware::FRenderTargetRegion &region) override;
 
     void ClearStencilBuffer(std::uint8_t value) override;
 

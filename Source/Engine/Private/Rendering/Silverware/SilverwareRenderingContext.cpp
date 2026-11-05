@@ -8,11 +8,13 @@
 #include <limits>
 #include <vector>
 
-SilverwareRenderingContext::SilverwareRenderingContext(IRenderDevice& renderDevice)
-    : m_RenderDevice(renderDevice)
+SilverwareRenderingContext::SilverwareRenderingContext(
+    IRenderDevice& renderDevice,
+    IRenderTargetProcessor& renderTargetProcessor)
+    : m_RenderDevice(renderDevice),
+      m_RenderTargetProcessor(renderTargetProcessor)
 {
 }
-
 SilverwareRenderingContext::~SilverwareRenderingContext()
 {
     while (PopRenderTarget())
@@ -520,6 +522,66 @@ bool SilverwareRenderingContext::CompositeRenderTargets(
         sourceIt->second.Resource,
         destinationResource,
         redleafBlendMode);
+}
+
+bool SilverwareRenderingContext::ApplyFilter(
+    Silverware::FRenderTargetHandle source,
+    Silverware::FRenderTargetHandle output,
+    const Silverware::FRenderTargetFilterDesc& filter,
+    const Silverware::FRenderTargetRegion& region)
+{
+    if (!source.IsValid() ||
+        !output.IsValid() ||
+        source.Value == output.Value ||
+        !region.IsValid())
+        return false;
+
+    const auto sourceIt = m_RenderTargets.find(source.Value);
+    const auto outputIt = m_RenderTargets.find(output.Value);
+
+    if (sourceIt == m_RenderTargets.end() ||
+        outputIt == m_RenderTargets.end())
+        return false;
+
+    const FRenderTargetEntry& sourceTarget = sourceIt->second;
+    const FRenderTargetEntry& outputTarget = outputIt->second;
+
+    if (sourceTarget.width != outputTarget.width ||
+        sourceTarget.height != outputTarget.height)
+        return false;
+
+    if (region.x > sourceTarget.width ||
+        region.y > sourceTarget.height ||
+        region.width > sourceTarget.width - region.x ||
+        region.height > sourceTarget.height - region.y)
+        return false;
+
+    FRenderTargetFilterDesc renderFilter{};
+
+    switch (filter.type)
+    {
+        case Silverware::ERenderTargetFilterType::GaussianBlur:
+            renderFilter.type = ::ERenderTargetFilterType::GaussianBlur;
+            break;
+
+        default:
+            return false;
+    }
+
+    renderFilter.sigma = filter.sigma;
+
+    const FRenderTargetRegion renderRegion{
+        region.x,
+        region.y,
+        region.width,
+        region.height
+    };
+
+    return m_RenderTargetProcessor.ApplyFilter(
+        sourceTarget.Resource,
+        outputTarget.Resource,
+        renderFilter,
+        renderRegion);
 }
 
 void SilverwareRenderingContext::ClearStencilBuffer(std::uint8_t value)

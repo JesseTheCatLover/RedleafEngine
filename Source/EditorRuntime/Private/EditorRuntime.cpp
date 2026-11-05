@@ -97,7 +97,7 @@ EditorRuntime::~EditorRuntime()
 
 TUniquePtr<Silverware::IRenderingContext> EditorRuntime::CreateSilverwareRenderingContext()
 {
-    return MakeUnique<SilverwareRenderingContext>(m_Renderer);
+    return MakeUnique<SilverwareRenderingContext>(m_Renderer, m_Renderer);
 }
 
 TSharedPtr<Silverware::IResourceSource> EditorRuntime::CreateSilverwareResourceSource(
