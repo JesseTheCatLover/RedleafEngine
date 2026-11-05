@@ -2445,7 +2445,7 @@ bool RendererSubsystem::ApplyFilter(
     switch (filter.type)
     {
         case ERenderTargetFilterType::GaussianBlur:
-            if (!std::isfinite(filter.sigma) || filter.sigma <= 0.0f)
+            if (!std::isfinite(filter.sigma) || filter.sigma < 0.0f)
                 return false;
             break;
 
