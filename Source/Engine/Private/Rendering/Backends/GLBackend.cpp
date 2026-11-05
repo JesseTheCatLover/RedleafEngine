@@ -1094,6 +1094,7 @@ void GLBackend::ResolveFramebuffer(RFramebufferHandle src, RFramebufferHandle ds
 bool GLBackend::PushFramebuffer(RFramebufferHandle handle)
 {
     auto it = m_Framebuffers.end();
+
     if (handle.IsValid())
     {
         it = m_Framebuffers.find(handle);
@@ -1118,6 +1119,7 @@ bool GLBackend::PushFramebuffer(RFramebufferHandle handle)
     const FGLFramebuffer& framebuffer = it->second;
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
     glViewport(0, 0, framebuffer.width, framebuffer.height);
+
     return true;
 }
 

@@ -87,6 +87,18 @@ public:
         GLint viewport[4]{};
     };
 
+    struct FStencilFaceState
+    {
+        GLint function = GL_ALWAYS;
+        GLint reference = 0;
+        GLint valueMask = 0xFF;
+        GLint writeMask = 0xFF;
+
+        GLint stencilFail = GL_KEEP;
+        GLint depthFail = GL_KEEP;
+        GLint depthPass = GL_KEEP;
+    };
+
     struct FRenderState
     {
         GLboolean bBlendEnabled = GL_FALSE;
@@ -105,6 +117,13 @@ public:
         GLboolean colorWriteMask[4]{
             GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE
         };
+
+        GLboolean bScissorEnabled = GL_FALSE;
+        GLint scissorBox[4]{};
+
+        GLboolean bStencilEnabled = GL_FALSE;
+        FStencilFaceState stencilFront{};
+        FStencilFaceState stencilBack{};
 
         GLint currentProgram = 0;
         GLint vertexArray = 0;
