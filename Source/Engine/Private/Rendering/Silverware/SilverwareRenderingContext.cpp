@@ -22,7 +22,7 @@ SilverwareRenderingContext::~SilverwareRenderingContext()
     }
 
     for (const auto& [_, target] : m_RenderTargets)
-        m_RenderDevice.DestroyRenderTarget(target.Resource);
+        m_RenderDevice.DestroyRenderTarget(target.resource);
 
     m_RenderTargets.clear();
 
@@ -30,8 +30,8 @@ SilverwareRenderingContext::~SilverwareRenderingContext()
         m_RenderDevice.DestroyMesh(mesh);
 
     for (const auto& [_, texture] : m_Textures)
-        if (texture.bOwned && texture.Resource.IsValid())
-            m_RenderDevice.DestroyTexture(texture.Resource);
+        if (texture.bOwned && texture.resource.IsValid())
+            m_RenderDevice.DestroyTexture(texture.resource);
 }
 
 void SilverwareRenderingContext::SetViewportSize(int width, int height)
@@ -168,12 +168,12 @@ void SilverwareRenderingContext::DestroyTexture(Silverware::FTextureHandle textu
         const auto targetIt = m_RenderTargets.find(it->second.renderTargetOwner);
 
         if (targetIt != m_RenderTargets.end() &&
-            targetIt->second.Texture.Value == texture.Value)
-            targetIt->second.Texture = {};
+            targetIt->second.texture.Value == texture.Value)
+            targetIt->second.texture = {};
     }
 
-    if (it->second.bOwned && it->second.Resource.IsValid())
-        m_RenderDevice.DestroyTexture(it->second.Resource);
+    if (it->second.bOwned && it->second.resource.IsValid())
+        m_RenderDevice.DestroyTexture(it->second.resource);
 
     m_Textures.erase(it);
 }
@@ -199,7 +199,7 @@ Silverware::FTextureHandle SilverwareRenderingContext::CreateTextureFromRenderTa
 
     const RTextureHandle resource =
         m_RenderDevice.CreateTextureFromRenderTargetRegion(
-            target.Resource, x, y, width, height);
+            target.resource, x, y, width, height);
 
     if (!resource.IsValid())
         return {};
@@ -261,7 +261,7 @@ bool SilverwareRenderingContext::UpdateExternalTexture(
             return false;
     }
 
-    it->second.Resource = resource;
+    it->second.resource = resource;
     return true;
 }
 
@@ -289,10 +289,10 @@ void SilverwareRenderingContext::RenderGeometry(
     {
         const auto textureIt = m_Textures.find(texture.Value);
 
-        if (textureIt == m_Textures.end() || !textureIt->second.Resource.IsValid())
+        if (textureIt == m_Textures.end() || !textureIt->second.resource.IsValid())
             return;
 
-        textureHandle = textureIt->second.Resource;
+        textureHandle = textureIt->second.resource;
     }
 
     m_RenderDevice.SubmitScreenSpaceGeometry(
@@ -359,10 +359,10 @@ void SilverwareRenderingContext::DestroyRenderTarget(Silverware::FRenderTargetHa
         if (entry.target == target.Value)
             return;
 
-    if (it->second.Texture.IsValid())
-        m_Textures.erase(it->second.Texture.Value);
+    if (it->second.texture.IsValid())
+        m_Textures.erase(it->second.texture.Value);
 
-    m_RenderDevice.DestroyRenderTarget(it->second.Resource);
+    m_RenderDevice.DestroyRenderTarget(it->second.resource);
     m_RenderTargets.erase(it);
 }
 
@@ -378,14 +378,14 @@ Silverware::FTextureHandle SilverwareRenderingContext::GetRenderTargetTexture(
         return {};
 
     // Reuse the existing Silverware alias.
-    if (it->second.Texture.IsValid())
-        return it->second.Texture;
+    if (it->second.texture.IsValid())
+        return it->second.texture;
 
     if (m_NextTextureHandle == 0)
         return {};
 
     const RTextureHandle resource =
-        m_RenderDevice.GetRenderTargetColorTexture(it->second.Resource);
+        m_RenderDevice.GetRenderTargetColorTexture(it->second.resource);
 
     if (!resource.IsValid())
         return {};
@@ -400,7 +400,7 @@ Silverware::FTextureHandle SilverwareRenderingContext::GetRenderTargetTexture(
         target.Value
     });
 
-    it->second.Texture = texture;
+    it->second.texture = texture;
     return texture;
 }
 
@@ -420,7 +420,7 @@ bool SilverwareRenderingContext::PushRenderTarget(Silverware::FRenderTargetHandl
         m_ViewportHeight
     });
 
-    if (!m_RenderDevice.PushRenderTarget(it->second.Resource))
+    if (!m_RenderDevice.PushRenderTarget(it->second.resource))
     {
         m_RenderTargetStack.pop_back();
         return false;
@@ -474,7 +474,7 @@ bool SilverwareRenderingContext::ClearRenderTarget(Silverware::FRenderTargetHand
     renderClearDesc.bClearStencil = desc.bClearStencil;
     renderClearDesc.stencil = desc.stencil;
 
-    return m_RenderDevice.ClearRenderTarget(it->second.Resource, renderClearDesc);
+    return m_RenderDevice.ClearRenderTarget(it->second.resource, renderClearDesc);
 }
 
 bool SilverwareRenderingContext::CompositeRenderTargets(
@@ -499,7 +499,7 @@ bool SilverwareRenderingContext::CompositeRenderTargets(
         if (destinationIt == m_RenderTargets.end())
             return false;
 
-        destinationResource = destinationIt->second.Resource;
+        destinationResource = destinationIt->second.resource;
     }
 
     ERenderTargetBlendMode redleafBlendMode{};
@@ -519,7 +519,7 @@ bool SilverwareRenderingContext::CompositeRenderTargets(
     }
 
     return m_RenderDevice.CompositeRenderTargets(
-        sourceIt->second.Resource,
+        sourceIt->second.resource,
         destinationResource,
         redleafBlendMode);
 }
@@ -578,8 +578,8 @@ bool SilverwareRenderingContext::ApplyFilter(
     };
 
     return m_RenderTargetProcessor.ApplyFilter(
-        sourceTarget.Resource,
-        outputTarget.Resource,
+        sourceTarget.resource,
+        outputTarget.resource,
         renderFilter,
         renderRegion);
 }

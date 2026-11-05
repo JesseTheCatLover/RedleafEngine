@@ -15,15 +15,15 @@ class SilverwareRenderingContext final : public Silverware::IRenderingContext
 private:
     struct FTextureEntry
     {
-        RTextureHandle Resource{};
+        RTextureHandle resource{};
         bool bOwned = false;
         std::uint64_t renderTargetOwner = 0;
     };
 
     struct FRenderTargetEntry
     {
-        RRenderTargetHandle Resource{};
-        Silverware::FTextureHandle Texture{};
+        RRenderTargetHandle resource{};
+        Silverware::FTextureHandle texture{};
         int width = 0;
         int height = 0;
     };
