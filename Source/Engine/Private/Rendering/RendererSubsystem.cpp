@@ -2274,10 +2274,66 @@ bool RendererSubsystem::CompositeRenderTargets(RRenderTargetHandle source, RRend
     return bSucceeded && bStateRestored;
 }
 
-bool RendererSubsystem::ApplyFilter(RRenderTargetHandle source, RRenderTargetHandle output,
-    const FRenderTargetFilterDesc &filter, const FRenderTargetRegion &region)
+bool RendererSubsystem::ApplyFilter(
+    RRenderTargetHandle source,
+    RRenderTargetHandle output,
+    const FRenderTargetFilterDesc& filter,
+    const FRenderTargetRegion& region)
 {
-    return false;
+    if (!m_Backend || !source.IsValid() || !output.IsValid() || source == output)
+        return false;
+
+    const auto sourceIt = m_RenderTargets.find(source.id);
+    const auto outputIt = m_RenderTargets.find(output.id);
+
+    if (sourceIt == m_RenderTargets.end() || outputIt == m_RenderTargets.end())
+        return false;
+
+    const FTarget& sourceTarget = sourceIt->second;
+    const FTarget& outputTarget = outputIt->second;
+
+    if (!sourceTarget.color.IsValid() || !outputTarget.color.IsValid())
+        return false;
+
+    if (sourceTarget.w != outputTarget.w || sourceTarget.h != outputTarget.h)
+        return false;
+
+    if (!region.IsValid() ||
+        region.width > sourceTarget.w ||
+        region.height > sourceTarget.h ||
+        region.x > sourceTarget.w - region.width ||
+        region.y > sourceTarget.h - region.height)
+        return false;
+
+    switch (filter.type)
+    {
+        case ERenderTargetFilterType::GaussianBlur:
+            if (!std::isfinite(filter.sigma) || filter.sigma <= 0.0f)
+                return false;
+            break;
+
+        default:
+            return false;
+    }
+
+    if (!m_Backend->PushRenderState())
+        return false;
+
+    m_Backend->EnableScissorRegion(false);
+
+    IRenderBackend::FStencilState stencilState{};
+    stencilState.bEnable = false;
+    m_Backend->SetStencilState(stencilState);
+
+    // Temporary identity pass: copy the source into the output.
+    const bool bSucceeded = CompositeRenderTargets(
+        source,
+        output,
+        ERenderTargetBlendMode::Replace);
+
+    const bool bStateRestored = m_Backend->PopRenderState();
+
+    return bSucceeded && bStateRestored;
 }
 
 void RendererSubsystem::SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHandle texture, float translationX,
