@@ -931,6 +931,48 @@ void RendererSubsystem::EnsureGaussianBlurShader()
     m_GaussianBlurShader = m_Backend->CreateShader(shader);
 }
 
+bool RendererSubsystem::EnsureFilterScratchTarget(int width, int height)
+{
+    if (!m_Backend || width <= 0 || height <= 0)
+        return false;
+
+    if (m_FilterScratchTarget.IsValid())
+    {
+        const auto it = m_RenderTargets.find(m_FilterScratchTarget.id);
+
+        if (it != m_RenderTargets.end())
+        {
+            const bool bActive = std::find(
+                m_RenderTargetStack.begin(),
+                m_RenderTargetStack.end(),
+                m_FilterScratchTarget) != m_RenderTargetStack.end();
+
+            if (bActive)
+                return false;
+
+            if (it->second.w == width &&
+                it->second.h == height &&
+                it->second.color.IsValid() &&
+                !it->second.bHasDepthStencil)
+                return true;
+
+            DestroyRenderTarget(m_FilterScratchTarget);
+        }
+
+        m_FilterScratchTarget = {};
+    }
+
+    FRenderTargetDesc desc{};
+    desc.width = width;
+    desc.height = height;
+    desc.colorFormat = ERenderTargetColorFormat::RGBA16F;
+    desc.bHasDepthStencil = false;
+
+    m_FilterScratchTarget = CreateRenderTarget(desc);
+
+    return m_FilterScratchTarget.IsValid();
+}
+
 void RendererSubsystem::EnsureDebugLineShader()
 {
     if (m_DebugLineShader.IsValid())
@@ -2382,17 +2424,22 @@ bool RendererSubsystem::ApplyFilter(
     const FTarget& sourceTarget = sourceIt->second;
     const FTarget& outputTarget = outputIt->second;
 
-    if (!sourceTarget.color.IsValid() || !outputTarget.color.IsValid())
+    const int width = sourceTarget.w;
+    const int height = sourceTarget.h;
+
+    const RTextureHandle sourceTexture = sourceTarget.color;
+
+    if (!sourceTexture.IsValid() || !outputTarget.color.IsValid())
         return false;
 
-    if (sourceTarget.w != outputTarget.w || sourceTarget.h != outputTarget.h)
+    if (width != outputTarget.w || height != outputTarget.h)
         return false;
 
     if (!region.IsValid() ||
-        region.width > sourceTarget.w ||
-        region.height > sourceTarget.h ||
-        region.x > sourceTarget.w - region.width ||
-        region.y > sourceTarget.h - region.height)
+        region.width > width ||
+        region.height > height ||
+        region.x > width - region.width ||
+        region.y > height - region.height)
         return false;
 
     switch (filter.type)
@@ -2406,14 +2453,38 @@ bool RendererSubsystem::ApplyFilter(
             return false;
     }
 
-    if (!m_Backend->PushRenderState())
+    // The output cannot be modified while it is already active.
+    if (std::find(
+        m_RenderTargetStack.begin(),
+        m_RenderTargetStack.end(),
+        output) != m_RenderTargetStack.end())
         return false;
 
-    m_Backend->EnableScissorRegion(false);
+    if (!EnsureFilterScratchTarget(width, height))
+        return false;
 
-    IRenderBackend::FStencilState stencilState{};
-    stencilState.bEnable = false;
-    m_Backend->SetStencilState(stencilState);
+    const RRenderTargetHandle scratch = m_FilterScratchTarget;
+
+    if (scratch == source || scratch == output)
+        return false;
+
+    // EnsureFilterScratchTarget may insert into m_RenderTargets,
+    // potentially invalidating iterators and references through rehashing.
+    const auto outputAfterScratchIt = m_RenderTargets.find(output.id);
+    const auto scratchIt = m_RenderTargets.find(scratch.id);
+
+    if (outputAfterScratchIt == m_RenderTargets.end() ||
+        scratchIt == m_RenderTargets.end())
+        return false;
+
+    const RTextureHandle outputTexture = outputAfterScratchIt->second.color;
+    const RTextureHandle scratchTexture = scratchIt->second.color;
+
+    if (!outputTexture.IsValid() || !scratchTexture.IsValid())
+        return false;
+
+    if (scratchIt->second.bHasDepthStencil)
+        return false;
 
     EnsureFullscreenQuad();
     EnsureGaussianBlurShader();
@@ -2421,15 +2492,118 @@ bool RendererSubsystem::ApplyFilter(
     if (!m_FSQuad.IsValid() || !m_GaussianBlurShader.IsValid())
         return false;
 
-    // Temporary identity pass: copy the source into the output.
-    const bool bSucceeded = CompositeRenderTargets(
+    if (!m_Backend->PushRenderState())
+        return false;
+
+    // Intermediate processing must not inherit UI clipping.
+    m_Backend->EnableScissorRegion(false);
+
+    IRenderBackend::FStencilState disabledStencil{};
+    disabledStencil.bEnable = false;
+    m_Backend->SetStencilState(disabledStencil);
+
+    // Seed output with the original source image.
+    bool succeeded = CompositeRenderTargets(
         source,
         output,
         ERenderTargetBlendMode::Replace);
 
-    const bool bStateRestored = m_Backend->PopRenderState();
+    const float inverseWidth = 1.0f / static_cast<float>(width);
+    const float inverseHeight = 1.0f / static_cast<float>(height);
 
-    return bSucceeded && bStateRestored;
+    // Convert the top-left UI region to bottom-left texture coordinates.
+    const int bottom = height - region.y - region.height;
+
+    const float regionMin[] = {
+        (static_cast<float>(region.x) + 0.5f) * inverseWidth,
+        (static_cast<float>(bottom) + 0.5f) * inverseHeight
+    };
+
+    const float regionMax[] = {
+        (static_cast<float>(region.x + region.width) - 0.5f) * inverseWidth,
+        (static_cast<float>(bottom + region.height) - 0.5f) * inverseHeight
+    };
+
+    auto drawBlurPass = [&](RTextureHandle input,
+                            RRenderTargetHandle destination,
+                            float directionX,
+                            float directionY) -> bool
+    {
+        if (!PushRenderTarget(destination))
+            return false;
+
+        m_Backend->SetCullMode(IRenderBackend::ECullMode::None);
+
+        m_Backend->SetDepthState(
+            false,
+            false,
+            IRenderBackend::ECompareFunc::Always);
+
+        m_Backend->SetBlendState(
+            false,
+            IRenderBackend::EBlendFactor::One,
+            IRenderBackend::EBlendFactor::Zero);
+
+        m_Backend->SetColorWriteMask(true, true, true, true);
+
+        m_Backend->BindShader(m_GaussianBlurShader);
+
+        m_Backend->SetUniformInt(m_GaussianBlurShader, "u_Input", 0);
+        m_Backend->SetUniformFloat(m_GaussianBlurShader, "u_Sigma", filter.sigma);
+
+        const float texelOffset[] = {
+            directionX * inverseWidth,
+            directionY * inverseHeight
+        };
+
+        m_Backend->SetUniformVec2(
+            m_GaussianBlurShader,
+            "u_TexelOffset",
+            texelOffset);
+
+        m_Backend->SetUniformVec2(
+            m_GaussianBlurShader,
+            "u_TexCoordMin",
+            regionMin);
+
+        m_Backend->SetUniformVec2(
+            m_GaussianBlurShader,
+            "u_TexCoordMax",
+            regionMax);
+
+        m_Backend->BindTexture(input, 0);
+
+        m_Backend->SubmitMesh(
+            m_FSQuad,
+            m_GaussianBlurShader,
+            FMatrix4::Identity());
+
+        return PopRenderTarget();
+    };
+
+    // Pass 1: vertical blur, output -> scratch.
+    if (succeeded)
+    {
+        succeeded = drawBlurPass(
+            outputTexture,
+            scratch,
+            0.0f,
+            1.0f);
+    }
+
+    // Pass 2: horizontal blur, scratch -> output.
+    if (succeeded)
+    {
+        succeeded = drawBlurPass(
+            scratchTexture,
+            output,
+            1.0f,
+            0.0f);
+    }
+
+    const bool stateRestored = m_Backend->PopRenderState();
+
+    return succeeded && stateRestored;
 }
 
 void RendererSubsystem::SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHandle texture, float translationX,

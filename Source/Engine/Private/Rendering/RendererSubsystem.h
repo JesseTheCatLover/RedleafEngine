@@ -71,6 +71,9 @@ private:
     RShaderHandle m_GaussianBlurShader{};
     void EnsureGaussianBlurShader();
 
+    RRenderTargetHandle m_FilterScratchTarget{};
+    bool EnsureFilterScratchTarget(int width, int height);
+
     RShaderHandle m_DebugLineShader{};
     void EnsureDebugLineShader();
 
