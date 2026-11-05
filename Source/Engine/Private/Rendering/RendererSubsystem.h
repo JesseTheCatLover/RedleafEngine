@@ -68,6 +68,9 @@ private:
     RShaderHandle m_UIGeometryShader{};
     void EnsureUIGeometryShader();
 
+    RShaderHandle m_GaussianBlurShader{};
+    void EnsureGaussianBlurShader();
+
     RShaderHandle m_DebugLineShader{};
     void EnsureDebugLineShader();
 

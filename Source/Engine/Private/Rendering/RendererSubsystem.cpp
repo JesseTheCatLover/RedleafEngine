@@ -840,6 +840,97 @@ void RendererSubsystem::EnsureUIGeometryShader()
     m_UIGeometryShader = m_Backend->CreateShader(shader);
 }
 
+void RendererSubsystem::EnsureGaussianBlurShader()
+{
+    if (m_GaussianBlurShader.IsValid())
+        return;
+
+    RShader shader{};
+
+    shader.vertexSource = R"(
+        #version 330 core
+
+        layout(location = 0) in vec3 aPosition;
+        layout(location = 2) in vec2 aTexCoord;
+
+        out vec2 vUV;
+
+        void main()
+        {
+            vUV = aTexCoord;
+            gl_Position = vec4(aPosition, 1.0);
+        }
+    )";
+
+    shader.fragmentSource = R"(
+        #version 330 core
+
+        in vec2 vUV;
+        out vec4 FragColor;
+
+        uniform sampler2D u_Input;
+        uniform float u_Sigma;
+        uniform vec2 u_TexelOffset;
+        uniform vec2 u_TexCoordMin;
+        uniform vec2 u_TexCoordMax;
+
+        const int MAX_BLUR_RADIUS = 32;
+
+        void main()
+        {
+            // Preserve pixels outside the requested region.
+            if (vUV.x < u_TexCoordMin.x ||
+                vUV.y < u_TexCoordMin.y ||
+                vUV.x > u_TexCoordMax.x ||
+                vUV.y > u_TexCoordMax.y)
+            {
+                FragColor = texture(u_Input, vUV);
+                return;
+            }
+
+            float sigma = max(u_Sigma, 0.0001);
+            int radius = min(
+                int(ceil(3.0 * sigma)),
+                MAX_BLUR_RADIUS);
+
+            vec4 color = texture(u_Input, vUV);
+            float totalWeight = 1.0;
+
+            for (int i = 1; i <= MAX_BLUR_RADIUS; ++i)
+            {
+                if (i > radius)
+                    break;
+
+                float sampleOffset = float(i);
+                float weight = exp(
+                    -(sampleOffset * sampleOffset) /
+                    (2.0 * sigma * sigma));
+
+                vec2 offset = u_TexelOffset * sampleOffset;
+
+                vec2 positiveUV = clamp(
+                    vUV + offset,
+                    u_TexCoordMin,
+                    u_TexCoordMax);
+
+                vec2 negativeUV = clamp(
+                    vUV - offset,
+                    u_TexCoordMin,
+                    u_TexCoordMax);
+
+                color += texture(u_Input, positiveUV) * weight;
+                color += texture(u_Input, negativeUV) * weight;
+
+                totalWeight += 2.0 * weight;
+            }
+
+            FragColor = color / totalWeight;
+        }
+    )";
+
+    m_GaussianBlurShader = m_Backend->CreateShader(shader);
+}
+
 void RendererSubsystem::EnsureDebugLineShader()
 {
     if (m_DebugLineShader.IsValid())
@@ -1278,7 +1369,6 @@ void RendererSubsystem::RenderSceneBatch(const FSceneBatch& batch)
 
             finalColor = RunPostProcessChain(finalColor, sceneRT.w, sceneRT.h, view.postProfileId, frameParams);
         }
-
 
         // 9) Present this view
         if (view.targetFBO.IsValid())  // Editor/RT
@@ -2324,6 +2414,12 @@ bool RendererSubsystem::ApplyFilter(
     IRenderBackend::FStencilState stencilState{};
     stencilState.bEnable = false;
     m_Backend->SetStencilState(stencilState);
+
+    EnsureFullscreenQuad();
+    EnsureGaussianBlurShader();
+
+    if (!m_FSQuad.IsValid() || !m_GaussianBlurShader.IsValid())
+        return false;
 
     // Temporary identity pass: copy the source into the output.
     const bool bSucceeded = CompositeRenderTargets(
