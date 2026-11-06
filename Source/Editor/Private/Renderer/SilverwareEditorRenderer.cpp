@@ -537,6 +537,25 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     if (!richButton)
         return false;
 
+    FWidgetTransformStyle transformStyle;
+
+    transformStyle.operations = FTransformOperationList
+    {
+        FTranslateTransform{
+            FLayoutLength::Units(20.0f),
+            FLayoutLength::Units(0.0f)
+        },
+        FRotateTransform{15.0f},
+        FScaleTransform{1.2f, 1.2f}
+    };
+
+    transformStyle.origin = FTransformOrigin{
+        FLayoutLength::Percent(50.0f),
+        FLayoutLength::Percent(50.0f)
+    };
+
+    richButton->SetTransformStyle(std::move(transformStyle));
+
     // Icon
     FResourcePath iconSource;
 
