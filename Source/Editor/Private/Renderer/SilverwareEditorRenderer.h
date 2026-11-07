@@ -27,6 +27,7 @@ private:
     Silverware::ContainerWidget* m_InteractiveBlockPlayground = nullptr;
 
     Silverware::FEventConnection m_PrimaryButtonClickConnection;
+    decltype(m_PrimaryButtonClickConnection) m_FontButtonClickConnections[3];
 
 public:
     SilverwareEditorRenderer();

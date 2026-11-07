@@ -1,3 +1,4 @@
+
 // Copyright 2026 JesseTheCatLover. All Rights Reserved.
 
 #include "SilverwareEditorRenderer.h"
@@ -8,11 +9,13 @@
 #include "Silverware/Core/Widgets/ContainerWidget.h"
 #include "Silverware/Core/Widgets/CoreWidget.h"
 #include "Silverware/Core/Widgets/WidgetLayout.h"
+#include "Silverware/Core/Widgets/Styling/TextStyle.h"
 #include "Silverware/UI/TextWidget.h"
 
 #include <iostream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "Silverware/UI/ButtonWidget.h"
 #include "Silverware/UI/ImageWidget.h"
@@ -61,6 +64,12 @@ namespace
     }
 
     constexpr char kPlaygroundThemeID[] = "Redleaf.SilverwarePlayground";
+
+    struct FTypographySample
+    {
+        Silverware::TextWidget* widget = nullptr;
+        Silverware::FTextStyle baseStyle;
+    };
 
     FStyleValue Token(const char* tokenID)
     {
@@ -264,6 +273,185 @@ namespace
             return nullptr;
 
         return rawWidget;
+    }
+
+    Silverware::TextWidget* AddStyledText(
+        Silverware::ContainerWidget& parent,
+        std::string text,
+        Silverware::FTextStyle style)
+    {
+        using namespace Silverware;
+
+        auto widget = Silverware::MakeUnique<TextWidget>(std::move(text));
+
+        FWidgetLayout layout;
+        layout.width = FLayoutLength::Percent(100.0f);
+        layout.height = FLayoutLength::Auto();
+        widget->SetLayout(layout);
+        widget->SetTextStyle(std::move(style));
+
+        TextWidget* rawWidget = widget.get();
+
+        if (!parent.AddChild(Silverware::TUniquePtr<CoreWidget>(widget.release())))
+            return nullptr;
+
+        return rawWidget;
+    }
+
+    bool AddTypographySamples(
+        Silverware::ContainerWidget& parent,
+        std::vector<FTypographySample>& outSamples)
+    {
+        using namespace Silverware;
+
+        const auto addHeading = [&parent, &outSamples](const char* text)
+        {
+            TextWidget* widget = AddText(parent, text, "Kicker");
+
+            if (!widget)
+                return false;
+
+            outSamples.push_back({widget, FTextStyle{}});
+            return true;
+        };
+
+        const auto addSample = [&parent, &outSamples](const char* text, FTextStyle style)
+        {
+            FTextStyle baseStyle = style;
+            TextWidget* widget = AddStyledText(parent, text, std::move(style));
+
+            if (!widget)
+                return false;
+
+            outSamples.push_back({widget, std::move(baseStyle)});
+            return true;
+        };
+
+        if (!addHeading("FONT WEIGHT:"))
+            return false;
+
+        const auto addWeight = [&addSample](const char* label, EFontWeight weight)
+        {
+            FTextStyle style;
+            style.fontSize = 12.0f;
+            style.fontWeight = weight;
+            return addSample(label, std::move(style));
+        };
+
+        if (!addWeight("Weight 100 - Thin", EFontWeight::Thin) ||
+            !addWeight("Weight 300 - Light", EFontWeight::Light) ||
+            !addWeight("Weight 400 - Normal", EFontWeight::Normal) ||
+            !addWeight("Weight 600 - SemiBold", EFontWeight::SemiBold) ||
+            !addWeight("Weight 700 - Bold", EFontWeight::Bold) ||
+            !addWeight("Weight 900 - Black", EFontWeight::Black))
+            return false;
+
+        if (!addHeading("FONT STYLE:"))
+            return false;
+
+        FTextStyle normalStyle;
+        normalStyle.fontSize = 14.0f;
+        normalStyle.fontWeight = EFontWeight::SemiBold;
+        normalStyle.fontStyle = EFontStyle::Normal;
+
+        FTextStyle italicStyle;
+        italicStyle.fontSize = 14.0f;
+        italicStyle.fontWeight = EFontWeight::SemiBold;
+        italicStyle.fontStyle = EFontStyle::Italic;
+
+        if (!addSample("Normal font face", std::move(normalStyle)) ||
+            !addSample("Italic font face", std::move(italicStyle)))
+            return false;
+
+        if (!addHeading("FONT KERNING:"))
+            return false;
+
+        FTextStyle kerningAuto;
+        kerningAuto.fontSize = 17.0f;
+        kerningAuto.fontKerning = EFontKerning::Auto;
+
+        FTextStyle kerningNormal;
+        kerningNormal.fontSize = 17.0f;
+        kerningNormal.fontKerning = EFontKerning::Normal;
+
+        FTextStyle kerningNone;
+        kerningNone.fontSize = 17.0f;
+        kerningNone.fontKerning = EFontKerning::None;
+
+        if (!addSample("AVATAR To Wa - kerning auto", std::move(kerningAuto)) ||
+            !addSample("AVATAR To Wa - kerning normal", std::move(kerningNormal)) ||
+            !addSample("AVATAR To Wa - kerning none", std::move(kerningNone)))
+            return false;
+
+        if (!addHeading("LETTER SPACING:"))
+            return false;
+
+        FTextStyle normalSpacing;
+        normalSpacing.letterSpacing = FLetterSpacing::Normal();
+
+        FTextStyle wideSpacing;
+        wideSpacing.letterSpacing = FLetterSpacing::Units(1.5f);
+
+        FTextStyle tightSpacing;
+        tightSpacing.letterSpacing = FLetterSpacing::Units(-0.5f);
+
+        if (!addSample("SILVERWARE - normal spacing", std::move(normalSpacing)) ||
+            !addSample("SILVERWARE - wide spacing", std::move(wideSpacing)) ||
+            !addSample("SILVERWARE - tight spacing", std::move(tightSpacing)))
+            return false;
+
+        if (!addHeading("LINE HEIGHT:"))
+            return false;
+
+        FTextStyle compactLineHeight;
+        compactLineHeight.lineHeight = FLineHeight::Multiplier(1.0f);
+
+        FTextStyle relaxedLineHeight;
+        relaxedLineHeight.lineHeight = FLineHeight::Multiplier(1.55f);
+
+        if (!addSample("1.0 - Line height controls the rhythm between wrapped lines in a text block. This is an example.",
+                       std::move(compactLineHeight)) ||
+            !addSample("1.55 - Line height controls the rhythm between wrapped lines in a text block. This is an exmaple.",
+                       std::move(relaxedLineHeight)))
+            return false;
+
+        if (!addHeading("TEXT DECORATION:"))
+            return false;
+
+        FTextStyle underline;
+        underline.textDecoration = ETextDecoration::Underline;
+
+        FTextStyle overline;
+        overline.textDecoration = ETextDecoration::Overline;
+
+        FTextStyle lineThrough;
+        lineThrough.textDecoration = ETextDecoration::LineThrough;
+
+        if (!addSample("Underline decoration", std::move(underline)) ||
+            !addSample("Overline decoration", std::move(overline)) ||
+            !addSample("Line-through decoration", std::move(lineThrough)))
+            return false;
+
+        if (!addHeading("TEXT TRANSFORM:"))
+            return false;
+
+        FTextStyle uppercase;
+        uppercase.textTransform = ETextTransform::Uppercase;
+
+        FTextStyle lowercase;
+        lowercase.textTransform = ETextTransform::Lowercase;
+
+        FTextStyle capitalize;
+        capitalize.textTransform = ETextTransform::Capitalize;
+
+        constexpr char kTransformSample[] = "Silverware typography sample";
+
+        if (!addSample(("Uppercase: " + std::string(kTransformSample)).c_str(), std::move(uppercase)) ||
+            !addSample(("Lowercase: " + std::string(kTransformSample)).c_str(), std::move(lowercase)) ||
+            !addSample(("Capitalize: " + std::string(kTransformSample)).c_str(), std::move(capitalize)))
+            return false;
+
+        return true;
     }
 
     void SetPadding(Silverware::FWidgetLayout& layout, float top, float right, float bottom, float left)
@@ -483,19 +671,21 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         panelLayout,
         MakeContainerLayout(ELayoutDirection::Vertical, 10.0f));
 
-    ContainerWidget* blockPanel = AddContainer(
+    // Use the second column for typography tests for now. The interactive-block
+    // playground can return once its dedicated test cases are ready.
+    ContainerWidget* typographyPanel = AddContainer(
         *body,
         "Panel",
         panelLayout,
         MakeContainerLayout(ELayoutDirection::Vertical, 10.0f));
 
-    if (!buttonPanel || !blockPanel)
+    if (!buttonPanel || !typographyPanel)
         return false;
 
     if (!AddText(*buttonPanel, "BUTTONS", "PanelTitle") ||
         !AddText(*buttonPanel, "Button interaction, focus and visual states.", "Body") ||
-        !AddText(*blockPanel, "INTERACTIVE BLOCKS", "PanelTitle") ||
-        !AddText(*blockPanel, "Pointer interaction, event propagation and capture.", "Body"))
+        !AddText(*typographyPanel, "TYPOGRAPHY", "PanelTitle") ||
+        !AddText(*typographyPanel, "Font selection, spacing and text presentation.", "Body"))
         return false;
 
     FWidgetLayout areaLayout;
@@ -509,13 +699,16 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         areaLayout,
         MakeContainerLayout(ELayoutDirection::Vertical, 8.0f));
 
-    m_InteractiveBlockPlayground = AddContainer(
-        *blockPanel,
+    ContainerWidget* typographyArea = AddContainer(
+        *typographyPanel,
         "PlaygroundArea",
         areaLayout,
-        MakeContainerLayout(ELayoutDirection::Vertical, 8.0f));
+        MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
 
-    if (!m_ButtonPlayground || !m_InteractiveBlockPlayground)
+    std::vector<FTypographySample> typographySamples;
+
+    if (!m_ButtonPlayground || !typographyArea ||
+        !AddTypographySamples(*typographyArea, typographySamples))
         return false;
 
     // Rich content button
@@ -598,6 +791,127 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
             std::cout << "[SilverwarePlayground]: Rich button clicked.\n";
         });
 
+    FWidgetTransformStyle transformStyleFontButton1;
+
+    transformStyleFontButton1.operations = FTransformOperationList
+    {
+        FTranslateTransform{
+            FLayoutLength::Units(32.0f),
+            FLayoutLength::Units(52.0f)
+        },
+        FRotateTransform{-9.0f},
+    };
+
+    transformStyleFontButton1.origin = FTransformOrigin{
+        FLayoutLength::Percent(50.0f),
+        FLayoutLength::Percent(50.0f)
+    };
+
+    FWidgetTransformStyle transformStyleFontButton2;
+
+    transformStyleFontButton2.operations = FTransformOperationList
+    {
+        FTranslateTransform{
+            FLayoutLength::Units(350.0f),
+            FLayoutLength::Units(60.0f)
+        },
+        FRotateTransform{12.0f},
+    };
+
+    transformStyleFontButton2.origin = FTransformOrigin{
+        FLayoutLength::Percent(50.0f),
+        FLayoutLength::Percent(50.0f)
+    };
+
+    FWidgetTransformStyle transformStyleFontButton3;
+
+    transformStyleFontButton3.operations = FTransformOperationList
+    {
+        FTranslateTransform{
+            FLayoutLength::Units(78.0f),
+            FLayoutLength::Units(110.0f)
+        },
+        FRotateTransform{15.0f},
+    };
+
+    transformStyleFontButton3.origin = FTransformOrigin{
+        FLayoutLength::Percent(50.0f),
+        FLayoutLength::Percent(50.0f)
+    };
+
+    const auto addFontButton = [
+                this,
+                &typographySamples,
+                transformStyleFontButton1,
+                transformStyleFontButton2,
+                transformStyleFontButton3, buttonLayout
+            ](
+        std::size_t connectionIndex,
+        const char *label,
+        std::string fontFamily) -> bool {
+        if (connectionIndex >= 3)
+            return false;
+
+        ButtonWidget *button = AddButton(
+            *m_ButtonPlayground,
+            "Primary",
+            buttonLayout,
+            MakeContainerLayout(
+                ELayoutDirection::Horizontal,
+                10.0f,
+                EAlignment::Center,
+                EJustification::Center));
+
+        if (!button)
+            return false;
+
+        switch (connectionIndex)
+        {
+            case 0:
+                button->SetTransformStyle(transformStyleFontButton1);
+                break;
+
+            case 1:
+                button->SetTransformStyle(transformStyleFontButton2);
+                break;
+
+            case 2:
+                button->SetTransformStyle(transformStyleFontButton3);
+                break;
+        }
+
+        if (!AddText(*button, label, "ButtonLabel"))
+            return false;
+
+        const std::vector<FTypographySample> samples = typographySamples;
+
+        m_FontButtonClickConnections[connectionIndex] =
+                button->OnClick().Connect(
+                    [samples, fontFamily = std::move(fontFamily)](FClickEvent &event) {
+                        event.MarkHandled();
+
+                        for (const FTypographySample &sample: samples)
+                        {
+                            if (!sample.widget)
+                                continue;
+
+                            FTextStyle style = sample.baseStyle;
+                            style.fontFamily = fontFamily;
+                            sample.widget->SetTextStyle(std::move(style));
+                        }
+
+                        std::cout << "[SilverwarePlayground]: Typography font changed to "
+                                << fontFamily << ".\n";
+                    });
+
+        return true;
+    };
+
+    if (!addFontButton(0, "FunnelSans", "Funnel Sans") ||
+        !addFontButton(1, "RobotoMono", "Roboto Mono") ||
+        !addFontButton(2, "LatoLatin", "LatoLatin"))
+        return false;
+
     // Footer
     FWidgetLayout footerLayout;
     footerLayout.height = FLayoutLength::Units(28.0f);
@@ -641,6 +955,9 @@ void SilverwareEditorRenderer::Shutdown()
     }
 
     m_PrimaryButtonClickConnection.Disconnect();
+
+    for (auto& connection : m_FontButtonClickConnections)
+        connection.Disconnect();
 
     m_ButtonPlayground = nullptr;
     m_InteractiveBlockPlayground = nullptr;
