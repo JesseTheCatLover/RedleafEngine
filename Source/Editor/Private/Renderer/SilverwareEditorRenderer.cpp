@@ -648,6 +648,84 @@ namespace
         return true;
     }
 
+    bool AddTextOverflowSamples(
+    Silverware::ContainerWidget& parent,
+    std::vector<FTypographySample>& outSamples)
+{
+    using namespace Silverware;
+
+    constexpr char kSampleText[] =
+        "Silverware is a retained UI framework designed to make complex interfaces easier to build and maintain.";
+
+    const auto addSample = [&parent, &outSamples, &kSampleText](
+        const char* label,
+        FTextOverflow textOverflow) -> bool
+    {
+        if (!AddText(parent, label, "Kicker"))
+            return false;
+
+        FWidgetLayout frameLayout;
+        frameLayout.width = FLayoutLength::Units(600.0f);
+        frameLayout.height = FLayoutLength::Units(38.0f);
+        SetPadding(frameLayout, 4.0f, 6.0f, 4.0f, 6.0f);
+
+        ContainerWidget* frame = AddContainer(
+            parent,
+            nullptr,
+            frameLayout,
+            MakeContainerLayout(
+                ELayoutDirection::Vertical,
+                0.0f,
+                EAlignment::Stretch,
+                EJustification::Start));
+
+        if (!frame)
+            return false;
+
+        FWidgetVisualStyle frameStyle;
+        frameStyle.backgroundColor = FColor{0.055f, 0.070f, 0.095f, 1.0f};
+        frameStyle.borderColor = FColor{0.25f, 0.32f, 0.42f, 1.0f};
+        frameStyle.borderWidth = 1.0f;
+        frame->SetVisualStyle(std::move(frameStyle));
+
+        FTextStyle textStyle;
+        textStyle.fontSize = 13.0f;
+        textStyle.whiteSpace = EWhiteSpace::NoWrap;
+        textStyle.textOverflow = std::move(textOverflow);
+
+        FTextStyle baseStyle = textStyle;
+
+        TextWidget* textWidget = AddStyledText(
+            *frame,
+            kSampleText,
+            std::move(textStyle));
+
+        if (!textWidget)
+            return false;
+
+        FWidgetLayout textLayout = textWidget->GetLayout();
+        textLayout.width = FLayoutLength::Percent(100.0f);
+        textLayout.height = FLayoutLength::Units(28.0f);
+        textWidget->SetLayout(textLayout);
+
+        FWidgetOverflowStyle overflowStyle;
+        overflowStyle.overflowX = EOverflowMode::Hidden;
+        overflowStyle.overflowY = EOverflowMode::Hidden;
+        textWidget->SetOverflowStyle(std::move(overflowStyle));
+
+        outSamples.push_back({textWidget, std::move(baseStyle)});
+
+        return true;
+    };
+
+    if (!addSample("TEXT OVERFLOW: CLIP", FTextOverflow::Clip()) ||
+        !addSample("TEXT OVERFLOW: ELLIPSIS", FTextOverflow::Ellipsis()) ||
+        !addSample("TEXT OVERFLOW: CUSTOM MARKER", FTextOverflow::Custom(" [more]")))
+        return false;
+
+    return true;
+}
+
     Silverware::ButtonWidget *AddButton(
         Silverware::ContainerWidget& parent,
     const char* variant,
@@ -856,8 +934,8 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
 
     if (!AddText(*buttonPanel, "BUTTONS", "PanelTitle") ||
     !AddText(*buttonPanel, "Button interaction, focus and visual states.", "Body") ||
-    !AddText(*typographyPanel, "OVERFLOW & CLIPPING", "PanelTitle") ||
-    !AddText(*typographyPanel, "Content boundaries and clipping behavior.", "Body"))
+    !AddText(*typographyPanel, "TEXT OVERFLOW", "PanelTitle") ||
+    !AddText(*typographyPanel, "Clipping, ellipsis and custom markers.", "Body"))
         return false;
 
     FWidgetLayout areaLayout;
@@ -880,8 +958,8 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     std::vector<FTypographySample> typographySamples;
 
     if (!m_ButtonPlayground || !typographyArea ||
-    !AddOverflowSamples(*typographyArea))
-        return false;
+    !AddTextOverflowSamples(*typographyArea, typographySamples))
+    return false;
 
     // Rich content button
     FWidgetLayout buttonLayout;
