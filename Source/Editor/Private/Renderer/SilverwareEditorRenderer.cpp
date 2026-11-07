@@ -454,7 +454,7 @@ namespace
         return true;
     }
 
-    void SetPadding(Silverware::FWidgetLayout& layout, float top, float right, float bottom, float left)
+    void SetPadding(Silverware::FWidgetLayout &layout, float top, float right, float bottom, float left)
     {
         layout.padding.top = Silverware::FLayoutLength::Units(top);
         layout.padding.right = Silverware::FLayoutLength::Units(right);
@@ -476,8 +476,180 @@ namespace
         return layout;
     }
 
-    Silverware::ButtonWidget* AddButton(
-    Silverware::ContainerWidget& parent,
+     bool AddOverflowTextCase(
+        ContainerWidget &parent,
+        const char *label,
+        EOverflowMode overflowX,
+        EOverflowMode overflowY,
+        EClipMode clipMode,
+        EWhiteSpace whiteSpace,
+        std::string text,
+        bool translateText = false,
+        bool ignoreAncestorClip = false)
+    {
+        if (!AddText(parent, label, "Kicker"))
+            return false;
+
+        FWidgetLayout frameLayout;
+        frameLayout.width = FLayoutLength::Percent(65.0f);
+        frameLayout.height = FLayoutLength::Units(52.0f);
+        SetPadding(frameLayout, 5.0f, 6.0f, 5.0f, 6.0f);
+
+        ContainerWidget *frame = AddContainer(
+            parent,
+            nullptr,
+            frameLayout,
+            MakeContainerLayout(
+                ELayoutDirection::Vertical,
+                0.0f,
+                EAlignment::Start,
+                EJustification::Start));
+
+        if (!frame)
+            return false;
+
+        FWidgetVisualStyle frameVisualStyle;
+        frameVisualStyle.backgroundColor = FColor{0.055f, 0.070f, 0.095f, 1.0f};
+        frameVisualStyle.borderColor = FColor{0.25f, 0.32f, 0.42f, 1.0f};
+        frameVisualStyle.borderWidth = 1.0f;
+        frameVisualStyle.cornerRadius = 6.0f;
+
+        frame->SetVisualStyle(std::move(frameVisualStyle));
+
+        FWidgetOverflowStyle overflowStyle;
+        overflowStyle.overflowX = overflowX;
+        overflowStyle.overflowY = overflowY;
+        overflowStyle.clip = clipMode;
+
+        frame->SetOverflowStyle(std::move(overflowStyle));
+
+        FTextStyle textStyle;
+        textStyle.fontSize = 11.0f;
+        textStyle.whiteSpace = whiteSpace;
+
+        TextWidget *content = AddStyledText(
+            *frame,
+            std::move(text),
+            std::move(textStyle));
+
+        if (!content)
+            return false;
+
+        if (translateText)
+        {
+            FWidgetTransformStyle transformStyle;
+            transformStyle.operations = FTransformOperationList{
+                FTranslateTransform{
+                    FLayoutLength::Units(180.0f),
+                    FLayoutLength::Units(0.0f)
+                }
+            };
+
+            content->SetTransformStyle(std::move(transformStyle));
+        }
+
+        if (ignoreAncestorClip)
+        {
+            FWidgetOverflowStyle childOverflowStyle;
+            childOverflowStyle.clip = EClipMode::None;
+            content->SetOverflowStyle(std::move(childOverflowStyle));
+        }
+
+        return true;
+    }
+
+    bool AddOverflowSamples(ContainerWidget &parent)
+    {
+        using namespace Silverware;
+
+        constexpr char kLongLine[] =
+                "This is deliberately long content that should extend beyond "
+                "the right boundary of its containing widget. It keeps going "
+                "to make overflow behavior easy to observe.";
+
+        if (!AddOverflowTextCase(
+            parent,
+            "VISIBLE / VISIBLE",
+            EOverflowMode::Visible,
+            EOverflowMode::Visible,
+            EClipMode::Auto,
+            EWhiteSpace::NoWrap,
+            kLongLine))
+            return false;
+
+        if (!AddOverflowTextCase(
+            parent,
+            "HIDDEN / HIDDEN",
+            EOverflowMode::Hidden,
+            EOverflowMode::Hidden,
+            EClipMode::Auto,
+            EWhiteSpace::NoWrap,
+            kLongLine))
+            return false;
+
+        if (!AddOverflowTextCase(
+            parent,
+            "HIDDEN X / VISIBLE Y",
+            EOverflowMode::Hidden,
+            EOverflowMode::Visible,
+            EClipMode::Auto,
+            EWhiteSpace::Pre,
+            "FIRST LINE - LONG CONTENT THAT EXTENDS OUTSIDE THE FRAME\n"
+            "SECOND LINE - THIS SHOULD ALSO CONTINUE BEYOND THE FRAME YOHOOOOOOOOOOOOOOOOOOOOOOOOO\n"
+            "THIRD LINE - MORE CONTENT TO TEST VERTICAL OVERFLOW\n"
+            "FOURTH LINE - STILL MORE CONTENT\n"
+            "FIFTH LINE - END OF TEST\n"
+            "SIXTH LINE - END OF TEST"))
+            return false;
+
+        if (!AddOverflowTextCase(
+            parent,
+            "AUTO / HIDDEN",
+            EOverflowMode::Auto,
+            EOverflowMode::Hidden,
+            EClipMode::Auto,
+            EWhiteSpace::NoWrap,
+            kLongLine))
+            return false;
+
+        if (!AddOverflowTextCase(
+            parent,
+            "SCROLL / HIDDEN",
+            EOverflowMode::Scroll,
+            EOverflowMode::Hidden,
+            EClipMode::Auto,
+            EWhiteSpace::NoWrap,
+            kLongLine))
+            return false;
+
+        if (!AddOverflowTextCase(
+            parent,
+            "TRANSFORMED CHILD - FORCED CLIPPING",
+            EOverflowMode::Hidden,
+            EOverflowMode::Hidden,
+            EClipMode::Always,
+            EWhiteSpace::NoWrap,
+            kLongLine,
+            true))
+            return false;
+
+        if (!AddOverflowTextCase(
+            parent,
+            "TRANSFORMED CHILD - IGNORE ANCESTOR CLIP",
+            EOverflowMode::Hidden,
+            EOverflowMode::Hidden,
+            EClipMode::Always,
+            EWhiteSpace::NoWrap,
+            kLongLine,
+            true,
+            true))
+            return false;
+
+        return true;
+    }
+
+    Silverware::ButtonWidget *AddButton(
+        Silverware::ContainerWidget& parent,
     const char* variant,
     Silverware::FWidgetLayout layout,
     Silverware::FContainerLayout contentLayout)
@@ -683,9 +855,9 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         return false;
 
     if (!AddText(*buttonPanel, "BUTTONS", "PanelTitle") ||
-        !AddText(*buttonPanel, "Button interaction, focus and visual states.", "Body") ||
-        !AddText(*typographyPanel, "TYPOGRAPHY", "PanelTitle") ||
-        !AddText(*typographyPanel, "Font selection, spacing and text presentation.", "Body"))
+    !AddText(*buttonPanel, "Button interaction, focus and visual states.", "Body") ||
+    !AddText(*typographyPanel, "OVERFLOW & CLIPPING", "PanelTitle") ||
+    !AddText(*typographyPanel, "Content boundaries and clipping behavior.", "Body"))
         return false;
 
     FWidgetLayout areaLayout;
@@ -708,7 +880,7 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     std::vector<FTypographySample> typographySamples;
 
     if (!m_ButtonPlayground || !typographyArea ||
-        !AddTypographySamples(*typographyArea, typographySamples))
+    !AddOverflowSamples(*typographyArea))
         return false;
 
     // Rich content button
