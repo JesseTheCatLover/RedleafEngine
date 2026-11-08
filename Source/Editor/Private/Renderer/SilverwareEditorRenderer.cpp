@@ -999,6 +999,22 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
 
     richButton->SetTransformStyle(std::move(transformStyle));
 
+    FLinearGradient gradient;
+    gradient.angleDegrees = 90.0f;
+    gradient.stops =
+    {
+        { FColor{1.0f, 0.0f, 0.0f, 1.0f}, 0.0f },
+        { FColor{1.0f, 1.0f, 0.0f, 1.0f}, 0.5f },
+        { FColor{0.0f, 0.0f, 1.0f, 1.0f}, 1.0f }
+    };
+
+    FWidgetVisualStyle style;
+    style.backgroundGradients = FGradientList{
+        FGradient{gradient}
+    };
+
+    richButton->SetVisualStyle(std::move(style));
+
     // Icon
     FResourcePath iconSource;
 
