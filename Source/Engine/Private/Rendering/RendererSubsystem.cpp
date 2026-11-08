@@ -2656,37 +2656,6 @@ void RendererSubsystem::SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHand
     m_Backend->SetColorWriteMask(true, true, true, true); // Restore color writes
 }
 
-void RendererSubsystem::SubmitScreenSpaceGeometry(
-    RMeshHandle mesh,
-    RTextureHandle texture,
-    float translationX,
-    float translationY,
-    int viewportWidth,
-    int viewportHeight,
-    bool bWriteColor,
-    const float* transform)
-{
-    if (!mesh.IsValid() || viewportWidth <= 0 || viewportHeight <= 0)
-        return;
-
-    EnsureUIGeometryShader();
-
-    if (!m_UIGeometryShader.IsValid())
-        return;
-
-    SubmitScreenSpaceGeometryWithShader(
-        mesh,
-        m_UIGeometryShader,
-        texture,
-        translationX,
-        translationY,
-        viewportWidth,
-        viewportHeight,
-        bWriteColor,
-        transform,
-        {});
-}
-
 void RendererSubsystem::SubmitScreenSpaceGeometryWithShader(
     RMeshHandle mesh, RShaderHandle shader,
     RTextureHandle texture,

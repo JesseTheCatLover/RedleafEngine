@@ -53,6 +53,11 @@ private:
 
     std::uint64_t m_NextRenderTargetHandle = 1;
 
+    std::unordered_map<std::uint64_t, Silverware::EScreenSpaceShaderType> m_Shaders;
+    std::uint64_t m_NextShaderHandle = 1;
+
+    RShaderHandle m_GradientShader{};
+
 public:
     explicit SilverwareRenderingContext(IRenderDevice& renderDevice, IRenderTargetProcessor& renderTargetProcessor);
     ~SilverwareRenderingContext() override;
@@ -109,4 +114,16 @@ public:
     void ClearStencilBuffer(std::uint8_t value) override;
 
     void SetClipMaskStencilState(const Silverware::FClipMaskStencilState &state) override;
+
+    Silverware::FShaderHandle CreateShader(Silverware::EScreenSpaceShaderType type) override;
+
+    void DestroyShader(Silverware::FShaderHandle shader) override;
+
+    void RenderGeometryWithShader(Silverware::FGeometryHandle geometry, Silverware::FShaderHandle shader,
+        Silverware::FTextureHandle texture, float translationX, float translationY,
+        const Silverware::FRenderTransform &transform, std::span<const Silverware::FShaderUniform> uniforms,
+        bool bWriteColor) override;
+
+private:
+    RShader BuildGradientShader();
 };
