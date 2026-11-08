@@ -802,6 +802,13 @@ void GLBackend::DestroyShader(RShaderHandle handle)
         m_Shaders.erase(it);
     }
 }
+
+void GLBackend::BindShader(RShaderHandle shader)
+{
+    auto it = m_Shaders.find(shader);
+    glUseProgram(it != m_Shaders.end() ? it->second.program : 0);
+}
+
 RFramebufferHandle GLBackend::CreateFramebuffer(const RFramebuffer& framebufferData)
 {
     FScopedGLFramebufferBindings previousBindings;
@@ -995,12 +1002,6 @@ RFramebufferHandle GLBackend::CreateFramebuffer(const RFramebuffer& framebufferD
     RFramebufferHandle h{ NextId(m_NextID) };
     m_Framebuffers[h] = fb;
     return h;
-}
-
-void GLBackend::BindShader(RShaderHandle shader)
-{
-    auto it = m_Shaders.find(shader);
-    glUseProgram(it != m_Shaders.end() ? it->second.program : 0);
 }
 
 void GLBackend::DestroyFramebuffer(RFramebufferHandle handle)
