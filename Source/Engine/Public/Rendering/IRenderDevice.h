@@ -3,6 +3,10 @@
 #pragma once
 #include <functional>
 #include <cstdint>
+#include <array>
+#include <span>
+#include <string>
+#include <variant>
 
 #include "RRenderOperations.h"
 #include "RRenderTarget.h"
@@ -32,6 +36,22 @@ struct FClipMaskStencilState
     bool bWrite = false;
     std::uint8_t reference = 0;
     EClipMaskStencilOperation operation = EClipMaskStencilOperation::Keep;
+};
+
+using FScreenSpaceShaderUniformValue = std::variant<
+    bool,
+    int,
+    float,
+    std::array<float, 2>,
+    std::array<float, 3>,
+    std::array<float, 4>,
+    std::array<float, 16>
+>;
+
+struct FScreenSpaceShaderUniform
+{
+    std::string name;
+    FScreenSpaceShaderUniformValue value;
 };
 
 class IRenderDevice
@@ -83,6 +103,15 @@ public:
     virtual void SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHandle texture,
     float translationX, float translationY,
     int viewportWidth, int viewportHeight, bool bWriteColor = true, const float* transform = nullptr) = 0;
+
+    virtual void SubmitScreenSpaceGeometryWithShader(
+    RMeshHandle mesh, RShaderHandle shader,
+    RTextureHandle texture,
+    float translationX, float translationY,
+    int viewportWidth, int viewportHeight,
+    bool bWriteColor,
+    const float* transform,
+    std::span<const FScreenSpaceShaderUniform> uniforms) = 0;
 
     virtual void EnableScissorRegion(bool bEnable) = 0;
     virtual void SetScissorRegion(int x, int y, int width, int height) = 0;

@@ -6,9 +6,11 @@
 #include "RRenderProxies.h"
 #include "Core/EngineGlobals.h"
 #include "Framework/PostProcessManager.h"
+
 #include <algorithm>
 #include <unordered_map>
 #include <limits>
+#include <type_traits>
 
 #include "RObjects.h"
 #include "Core/EngineContext.h"
@@ -2652,6 +2654,123 @@ void RendererSubsystem::SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHand
 
     m_Backend->SubmitMesh(mesh, m_UIGeometryShader, FMatrix4::Identity());
     m_Backend->SetColorWriteMask(true, true, true, true); // Restore color writes
+}
+
+void RendererSubsystem::SubmitScreenSpaceGeometry(
+    RMeshHandle mesh,
+    RTextureHandle texture,
+    float translationX,
+    float translationY,
+    int viewportWidth,
+    int viewportHeight,
+    bool bWriteColor,
+    const float* transform)
+{
+    if (!mesh.IsValid() || viewportWidth <= 0 || viewportHeight <= 0)
+        return;
+
+    EnsureUIGeometryShader();
+
+    if (!m_UIGeometryShader.IsValid())
+        return;
+
+    SubmitScreenSpaceGeometryWithShader(
+        mesh,
+        m_UIGeometryShader,
+        texture,
+        translationX,
+        translationY,
+        viewportWidth,
+        viewportHeight,
+        bWriteColor,
+        transform,
+        {});
+}
+
+void RendererSubsystem::SubmitScreenSpaceGeometryWithShader(
+    RMeshHandle mesh, RShaderHandle shader,
+    RTextureHandle texture,
+    float translationX, float translationY,
+    int viewportWidth, int viewportHeight,
+    bool bWriteColor,
+    const float* transform,
+    std::span<const FScreenSpaceShaderUniform> uniforms)
+{
+    if (!m_Backend ||
+        !mesh.IsValid() ||
+        !shader.IsValid() ||
+        viewportWidth <= 0 ||
+        viewportHeight <= 0)
+        return;
+
+    m_Backend->SetCullMode(IRenderBackend::ECullMode::None);
+    m_Backend->SetDepthState(false, false, IRenderBackend::ECompareFunc::Always);
+
+    m_Backend->SetBlendState(
+        true,
+        IRenderBackend::EBlendFactor::One,
+        IRenderBackend::EBlendFactor::OneMinusSrcAlpha);
+
+    m_Backend->SetColorWriteMask(bWriteColor, bWriteColor, bWriteColor, bWriteColor);
+    m_Backend->BindShader(shader);
+
+    const float translation[] = { translationX, translationY };
+
+    static constexpr float identityTransform[16] = {
+        1.f, 0.f, 0.f, 0.f,
+        0.f, 1.f, 0.f, 0.f,
+        0.f, 0.f, 1.f, 0.f,
+        0.f, 0.f, 0.f, 1.f
+    };
+
+    m_Backend->SetUniformVec2(shader, "u_Translation", translation);
+    m_Backend->SetUniformMat4(shader, "u_Transform", transform ? transform : identityTransform);
+
+    m_Backend->SetUniformInt(shader, "u_Texture", 0);
+    m_Backend->SetUniformInt(shader, "u_UseTexture", texture.IsValid() ? 1 : 0);
+
+    if (texture.IsValid())
+        m_Backend->BindTexture(texture, 0);
+
+    for (const FScreenSpaceShaderUniform& uniform : uniforms)
+    {
+        if (uniform.name.empty())
+            continue;
+
+        // These are reserved by the screen-space submission contract.
+        if (uniform.name == "u_Translation" ||
+            uniform.name == "u_Transform" ||
+            uniform.name == "u_Texture" ||
+            uniform.name == "u_UseTexture")
+            continue;
+
+        std::visit(
+            [&](const auto& value)
+            {
+                using TValue = std::decay_t<decltype(value)>;
+
+                if constexpr (std::is_same_v<TValue, bool>)
+                    m_Backend->SetUniformInt(shader, uniform.name.c_str(), value ? 1 : 0);
+                else if constexpr (std::is_same_v<TValue, int>)
+                    m_Backend->SetUniformInt(shader, uniform.name.c_str(), value);
+                else if constexpr (std::is_same_v<TValue, float>)
+                    m_Backend->SetUniformFloat(shader, uniform.name.c_str(), value);
+                else if constexpr (std::is_same_v<TValue, std::array<float, 2>>)
+                    m_Backend->SetUniformVec2(shader, uniform.name.c_str(), value.data());
+                else if constexpr (std::is_same_v<TValue, std::array<float, 3>>)
+                    m_Backend->SetUniformVec3(shader, uniform.name.c_str(), value.data());
+                else if constexpr (std::is_same_v<TValue, std::array<float, 4>>)
+                    m_Backend->SetUniformVec4(shader, uniform.name.c_str(), value.data());
+                else if constexpr (std::is_same_v<TValue, std::array<float, 16>>)
+                    m_Backend->SetUniformMat4(shader, uniform.name.c_str(), value.data());
+            },
+            uniform.value);
+    }
+
+    m_Backend->SubmitMesh(mesh, shader, FMatrix4::Identity());
+
+    // Preserve the existing UI submission behavior.
+    m_Backend->SetColorWriteMask(true, true, true, true);
 }
 
 void RendererSubsystem::EnableScissorRegion(bool bEnable)

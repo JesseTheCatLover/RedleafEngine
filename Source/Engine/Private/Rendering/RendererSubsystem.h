@@ -223,6 +223,15 @@ public:
                                    int viewportWidth, int viewportHeight, bool bWriteColor,
                                    const float* transform = nullptr) override;
 
+    void SubmitScreenSpaceGeometryWithShader(
+    RMeshHandle mesh,RShaderHandle shader,
+    RTextureHandle texture,
+    float translationX, float translationY,
+    int viewportWidth, int viewportHeight,
+    bool bWriteColor,
+    const float* transform,
+    std::span<const FScreenSpaceShaderUniform> uniforms) override;
+
     void EnableScissorRegion(bool bEnable) override;
 
     void SetScissorRegion(int x, int y, int width, int height) override;
