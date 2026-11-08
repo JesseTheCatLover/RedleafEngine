@@ -999,22 +999,6 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
 
     richButton->SetTransformStyle(std::move(transformStyle));
 
-    FLinearGradient gradient;
-    gradient.angleDegrees = 90.0f;
-    gradient.stops =
-    {
-        { FColor{1.0f, 0.0f, 0.0f, 1.0f}, 0.0f },
-        { FColor{1.0f, 1.0f, 0.0f, 1.0f}, 0.5f },
-        { FColor{0.0f, 0.0f, 1.0f, 1.0f}, 1.0f }
-    };
-
-    FWidgetVisualStyle style;
-    style.backgroundGradients = FGradientList{
-        FGradient{gradient}
-    };
-
-    richButton->SetVisualStyle(std::move(style));
-
     // Icon
     FResourcePath iconSource;
 
@@ -1105,12 +1089,57 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         FLayoutLength::Percent(50.0f)
     };
 
+    FWidgetVisualStyle fontButtonVisualStyle;
+
+    FLinearGradient fontButtonGradient;
+    fontButtonGradient.angleDegrees = 180.0f;
+    fontButtonGradient.stops = {
+        { FColor{0.30f, 0.40f, 0.54f, 1.0f}, 0.0f },
+        { FColor{0.20f, 0.30f, 0.44f, 1.0f}, 0.5f },
+        { FColor{0.13f, 0.21f, 0.33f, 1.0f}, 1.0f }
+    };
+
+    fontButtonVisualStyle.backgroundGradients = FGradientList{
+        FGradient{fontButtonGradient}
+    };
+
+    fontButtonVisualStyle.borderColor = FColor{0.48f, 0.59f, 0.72f, 0.65f};
+    fontButtonVisualStyle.borderWidth = 1.0f;
+    fontButtonVisualStyle.borderStyle = EBorderStyle::Solid;
+    fontButtonVisualStyle.cornerRadius = 7.0f;
+
+    FWidgetVisualStyle inkBlueButtonStyle;
+
+    inkBlueButtonStyle.backgroundColor = FColor{
+        0.341f, 0.420f, 0.502f, 1.0f // #576B80
+    };
+
+    FLinearGradient inkBlueGradient;
+    inkBlueGradient.angleDegrees = 180.0f;
+    inkBlueGradient.stops = {
+        { FColor{0.369f, 0.478f, 0.580f, 1.0f}, 0.0f }, // #5E7A94
+        { FColor{0.341f, 0.420f, 0.502f, 1.0f}, 0.45f }, // #576B80
+        { FColor{0.271f, 0.345f, 0.420f, 1.0f}, 1.0f } // #45586B
+    };
+
+    inkBlueButtonStyle.backgroundGradients = FGradientList{
+        FGradient{inkBlueGradient}
+    };
+
+    inkBlueButtonStyle.borderColor = FColor{
+        0.341f, 0.420f, 0.502f, 1.0f
+    };
+
+    inkBlueButtonStyle.borderWidth = 1.0f;
+    inkBlueButtonStyle.borderStyle = EBorderStyle::Solid;
+    inkBlueButtonStyle.cornerRadius = 3.0f;
+
     const auto addFontButton = [
                 this,
                 &typographySamples,
                 transformStyleFontButton1,
                 transformStyleFontButton2,
-                transformStyleFontButton3, buttonLayout
+                transformStyleFontButton3, buttonLayout, fontButtonVisualStyle, inkBlueButtonStyle
             ](
         std::size_t connectionIndex,
         const char *label,
@@ -1131,18 +1160,22 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         if (!button)
             return false;
 
+
         switch (connectionIndex)
         {
             case 0:
                 button->SetTransformStyle(transformStyleFontButton1);
+                button->SetVisualStyle(inkBlueButtonStyle);
                 break;
 
             case 1:
                 button->SetTransformStyle(transformStyleFontButton2);
+                button->SetVisualStyle(fontButtonVisualStyle);
                 break;
 
             case 2:
                 button->SetTransformStyle(transformStyleFontButton3);
+                button->SetVisualStyle(inkBlueButtonStyle);
                 break;
         }
 
