@@ -1099,7 +1099,7 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         { FColor{0.13f, 0.21f, 0.33f, 1.0f}, 1.0f }
     };
 
-    fontButtonVisualStyle.backgroundGradients = FGradientList{
+    fontButtonVisualStyle.backgroundLayers = FBackgroundLayerList{
         FGradient{fontButtonGradient}
     };
 
@@ -1122,7 +1122,7 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         { FColor{0.271f, 0.345f, 0.420f, 1.0f}, 1.0f } // #45586B
     };
 
-    inkBlueButtonStyle.backgroundGradients = FGradientList{
+    inkBlueButtonStyle.backgroundLayers = FBackgroundLayerList{
         FGradient{inkBlueGradient}
     };
 
