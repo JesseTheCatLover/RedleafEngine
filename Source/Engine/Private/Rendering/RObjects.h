@@ -85,6 +85,9 @@ struct RFramebuffer
 
     EColorMode colorMode = EColorMode::HDR16F; // default HDR pipeline
     EDepthMode depthMode = EDepthMode::D24S8;  // default depth
+
+    // Optional framebuffer whose depth-stencil attachment should be shared.
+    RFramebufferHandle sharedDepthStencilFramebuffer{};
 };
 
 struct RMaterial

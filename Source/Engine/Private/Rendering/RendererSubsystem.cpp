@@ -1157,7 +1157,8 @@ void RendererSubsystem::DestroyTarget(FTarget& t)
     t = {};
 }
 
-void RendererSubsystem::BuildTarget(FTarget& t, int w, int h, int samples, bool withDepth, bool hdr, bool bSrgb)
+void RendererSubsystem::BuildTarget(FTarget& t, int w, int h, int samples, bool withDepth, bool hdr, bool bSrgb,
+    RFramebufferHandle sharedDepthStencilFramebuffer)
 {
     // Describe the framebuffer; the backend owns its attachments.
     RFramebuffer fb{};
@@ -1171,6 +1172,10 @@ void RendererSubsystem::BuildTarget(FTarget& t, int w, int h, int samples, bool 
 
     fb.colorMode = bSrgb ? EColorMode::sRGB8_A8 : hdr ? EColorMode::HDR16F : EColorMode::LDR8;
     fb.depthMode = withDepth ? EDepthMode::D24S8 : EDepthMode::None;
+
+    fb.bDepthAsTexture = withDepth && fb.samples == 1 && !sharedDepthStencilFramebuffer.IsValid();
+    fb.depthMode = withDepth ? EDepthMode::D24S8 : EDepthMode::None;
+    fb.sharedDepthStencilFramebuffer = sharedDepthStencilFramebuffer;
 
     t.fbo = m_Backend->CreateFramebuffer(fb);
     if (!t.fbo.IsValid())
@@ -2107,6 +2112,34 @@ RRenderTargetHandle RendererSubsystem::CreateRenderTarget(const FRenderTargetDes
             return {};
     }
 
+    RFramebufferHandle sharedDepthStencilFramebuffer{};
+
+    if (desc.sharedDepthStencilTarget.IsValid())
+    {
+        if (!desc.bHasDepthStencil)
+            return {};
+
+        const auto sharedIt = m_RenderTargets.find(desc.sharedDepthStencilTarget.id);
+
+        if (sharedIt == m_RenderTargets.end())
+            return {};
+
+        const FTarget& sharedTarget = sharedIt->second;
+
+        const int requestedSamples = std::max(1, desc.sampleCount);
+
+        if (!sharedTarget.fbo.IsValid() ||
+            !sharedTarget.bHasDepthStencil ||
+            sharedTarget.w != desc.width ||
+            sharedTarget.h != desc.height ||
+            sharedTarget.samples != requestedSamples)
+        {
+            return {};
+        }
+
+        sharedDepthStencilFramebuffer = sharedTarget.fbo;
+    }
+
     FTarget target{};
 
     BuildTarget(
@@ -2116,7 +2149,8 @@ RRenderTargetHandle RendererSubsystem::CreateRenderTarget(const FRenderTargetDes
         desc.sampleCount,
         desc.bHasDepthStencil,
         bHDR,
-        bSRGB
+        bSRGB,
+        sharedDepthStencilFramebuffer
     );
 
     if (!target.fbo.IsValid())

@@ -11,6 +11,8 @@
 
 #include "Core/Math/FVector2.h"
 #include "Core/Math/FVector3.h"
+#include "Core/Memory/SmartPointers.h"
+#include "Rendering/RObjects.h"
 
 #define MAX_BONE_INFLUENCE 4
 
@@ -50,6 +52,26 @@ public:
         bool ownedByFBO = false; // True when created/owned by an FBO
     };
 
+    struct FGLDepthStencilStorage
+    {
+        GLuint renderbuffer = 0;
+
+        int width = 0;
+        int height = 0;
+        int samples = 1;
+
+        GLenum internalFormat = GL_DEPTH24_STENCIL8;
+        EDepthMode depthMode = EDepthMode::None;
+
+        bool bHasStencil = false;
+
+        ~FGLDepthStencilStorage()
+        {
+            if (renderbuffer)
+                glDeleteRenderbuffers(1, &renderbuffer);
+        }
+    };
+
     struct FGLFramebuffer
     {
         GLuint fbo = 0;
@@ -66,6 +88,8 @@ public:
         GLuint depthStencil = 0;             // renderbuffer for best perf, or texture if sampling
         bool bDepthIsTexture = false;
         GLenum depthInternalFormat = GL_DEPTH24_STENCIL8; // or GL_DEPTH_COMPONENT24, etc.
+
+        TSharedPtr<FGLDepthStencilStorage> depthStencilStorage{};
 
         // Engine-visible handles (valid only when texture && !MSAA)
         RTextureHandle colorTexHandle{};
@@ -256,4 +280,7 @@ public:
 
     void EnableScissorRegion(bool bEnable) override;
     void SetScissorRegion(int x, int y, int width, int height) override;
+
+private:
+    bool AttachSharedDepthStencil(FGLFramebuffer& framebuffer, const RFramebuffer& desc);
 };

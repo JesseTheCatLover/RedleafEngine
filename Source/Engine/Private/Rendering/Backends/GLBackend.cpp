@@ -247,18 +247,32 @@ void GLBackend::Shutdown()
 
     // Clean up Framebuffers first (this also erases any registered engine handles)
     for (auto &[_, fb] : m_Framebuffers) {
-        if (fb.fbo) glDeleteFramebuffers(1, &fb.fbo);
-        if (fb.colorAttachment) {
-            if (fb.samples == 1 && fb.bColorIsTexture) glDeleteTextures(1, &fb.colorAttachment);
-            else glDeleteRenderbuffers(1, &fb.colorAttachment);
+        if (fb.fbo)
+            glDeleteFramebuffers(1, &fb.fbo);
+
+        if (fb.colorAttachment)
+        {
+            if (fb.samples == 1 && fb.bColorIsTexture)
+                glDeleteTextures(1, &fb.colorAttachment);
+            else
+                glDeleteRenderbuffers(1, &fb.colorAttachment);
         }
-        if (fb.colorAttachmentMS) {
-            if (fb.samples > 1 && fb.bColorIsTexture) glDeleteTextures(1, &fb.colorAttachmentMS);
-            else glDeleteRenderbuffers(1, &fb.colorAttachmentMS);
+
+        if (fb.colorAttachmentMS)
+        {
+            if (fb.samples > 1 && fb.bColorIsTexture)
+                glDeleteTextures(1, &fb.colorAttachmentMS);
+            else
+                glDeleteRenderbuffers(1, &fb.colorAttachmentMS);
         }
-        if (fb.depthStencil) {
-            if (fb.bDepthIsTexture && fb.samples == 1) glDeleteTextures(1, &fb.depthStencil);
-            else glDeleteRenderbuffers(1, &fb.depthStencil);
+
+        // Clean up depth-stencil storage.
+        if (fb.depthStencil)
+        {
+            if (fb.bDepthIsTexture && fb.samples == 1)
+                glDeleteTextures(1, &fb.depthStencil);
+            else if (!fb.depthStencilStorage)
+                glDeleteRenderbuffers(1, &fb.depthStencil);
         }
     }
     m_Framebuffers.clear();
@@ -809,18 +823,25 @@ void GLBackend::BindShader(RShaderHandle shader)
     glUseProgram(it != m_Shaders.end() ? it->second.program : 0);
 }
 
+
 RFramebufferHandle GLBackend::CreateFramebuffer(const RFramebuffer& framebufferData)
 {
     FScopedGLFramebufferBindings previousBindings;
 
+    if (framebufferData.width <= 0 || framebufferData.height <= 0)
+        return {};
+
     FGLFramebuffer fb{};
-    fb.width   = framebufferData.width;
-    fb.height  = framebufferData.height;
+
+    fb.width = framebufferData.width;
+    fb.height = framebufferData.height;
     fb.samples = std::max(1, framebufferData.samples);
 
     const bool bWantColor = framebufferData.bHasColor;
 
-    // If there's no color target, force color flags off.
+    if (framebufferData.bDepthAsTexture && fb.samples > 1)
+        return {};
+
     fb.bColorIsTexture = bWantColor ? framebufferData.bColorAsTexture : false;
     fb.bDepthIsTexture = framebufferData.bDepthAsTexture;
 
@@ -830,217 +851,458 @@ RFramebufferHandle GLBackend::CreateFramebuffer(const RFramebuffer& framebufferD
     fb.colorInternalFormat = col.internal;
     fb.depthInternalFormat = dep.internal;
 
+    // Resolve shared depth-stencil storage.
+
+    TSharedPtr<FGLDepthStencilStorage> sharedDepthStencilStorage{};
+
+    if (framebufferData.sharedDepthStencilFramebuffer.IsValid())
+    {
+        if (framebufferData.depthMode == EDepthMode::None ||
+            framebufferData.bDepthAsTexture)
+            return {};
+
+        const auto sharedIt = m_Framebuffers.find(
+            framebufferData.sharedDepthStencilFramebuffer
+        );
+
+        if (sharedIt == m_Framebuffers.end())
+            return {};
+
+        const FGLFramebuffer& shared = sharedIt->second;
+        const auto& storage = shared.depthStencilStorage;
+
+        if (!storage ||
+            !storage->renderbuffer ||
+            shared.depthStencil != storage->renderbuffer ||
+            shared.bDepthIsTexture ||
+            shared.width != fb.width ||
+            shared.height != fb.height ||
+            shared.samples != fb.samples ||
+            shared.depthInternalFormat != dep.internal ||
+            storage->width != fb.width ||
+            storage->height != fb.height ||
+            storage->samples != fb.samples ||
+            storage->internalFormat != dep.internal ||
+            storage->depthMode != framebufferData.depthMode ||
+            storage->bHasStencil != dep.hasStencil)
+        {
+            return {};
+        }
+
+        sharedDepthStencilStorage = storage;
+    }
+
+    // Create framebuffer.
+
     glGenFramebuffers(1, &fb.fbo);
+
+    if (!fb.fbo)
+        return {};
+
     glBindFramebuffer(GL_FRAMEBUFFER, fb.fbo);
 
-    // -------------------------
-    // Color attachment
-    // -------------------------
+    // Cleanup helper.
+
+    const auto cleanup = [&]()
+    {
+        if (fb.colorTexHandle.IsValid())
+            m_Textures.erase(fb.colorTexHandle);
+
+        if (fb.depthTexHandle.IsValid())
+            m_Textures.erase(fb.depthTexHandle);
+
+        if (fb.fbo)
+            glDeleteFramebuffers(1, &fb.fbo);
+
+        // Color storage.
+        if (fb.colorAttachment)
+        {
+            if (fb.samples == 1 && fb.bColorIsTexture)
+                glDeleteTextures(1, &fb.colorAttachment);
+            else if (!fb.bColorIsTexture)
+                glDeleteRenderbuffers(1, &fb.colorAttachment);
+        }
+
+        if (fb.colorAttachmentMS)
+        {
+            if (fb.samples > 1 && fb.bColorIsTexture)
+                glDeleteTextures(1, &fb.colorAttachmentMS);
+            else
+                glDeleteRenderbuffers(1, &fb.colorAttachmentMS);
+        }
+
+        // Depth storage.
+        if (fb.depthStencil)
+        {
+            if (fb.bDepthIsTexture)
+                glDeleteTextures(1, &fb.depthStencil);
+            else if (!fb.depthStencilStorage)
+                glDeleteRenderbuffers(1, &fb.depthStencil);
+        }
+
+        // Releases owned or shared renderbuffer storage.
+        fb.depthStencilStorage.reset();
+    };
+
+    // Color attachment.
+
     if (!bWantColor)
     {
-        // Depth-only target: no color attachments
         glDrawBuffer(GL_NONE);
         glReadBuffer(GL_NONE);
 
-        fb.colorAttachment   = 0;
+        fb.colorAttachment = 0;
         fb.colorAttachmentMS = 0;
-        fb.colorTarget       = GL_TEXTURE_2D;
-        fb.colorTexHandle    = RTextureHandle::Invalid();
+        fb.colorTarget = GL_TEXTURE_2D;
+        fb.colorTexHandle = RTextureHandle::Invalid();
     }
     else
     {
+        glDrawBuffer(GL_COLOR_ATTACHMENT0);
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
+
         if (fb.samples > 1)
         {
-            // MSAA color
+            // MSAA color.
             if (fb.bColorIsTexture)
             {
                 glGenTextures(1, &fb.colorAttachmentMS);
                 glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, fb.colorAttachmentMS);
-                glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, fb.samples,
-                                        col.internal, fb.width, fb.height, GL_TRUE);
 
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                                       GL_TEXTURE_2D_MULTISAMPLE, fb.colorAttachmentMS, 0);
+                glTexImage2DMultisample(
+                    GL_TEXTURE_2D_MULTISAMPLE,
+                    fb.samples,
+                    col.internal,
+                    fb.width,
+                    fb.height,
+                    GL_TRUE
+                );
+
+                glFramebufferTexture2D(
+                    GL_FRAMEBUFFER,
+                    GL_COLOR_ATTACHMENT0,
+                    GL_TEXTURE_2D_MULTISAMPLE,
+                    fb.colorAttachmentMS,
+                    0
+                );
 
                 fb.colorTarget = GL_TEXTURE_2D_MULTISAMPLE;
+
                 glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
             }
             else
             {
-                GLuint rbo = 0;
-                glGenRenderbuffers(1, &rbo);
-                fb.colorAttachmentMS = rbo;
+                glGenRenderbuffers(1, &fb.colorAttachmentMS);
+                glBindRenderbuffer(GL_RENDERBUFFER, fb.colorAttachmentMS);
 
-                glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-                glRenderbufferStorageMultisample(GL_RENDERBUFFER, fb.samples,
-                                                 col.internal, fb.width, fb.height);
+                glRenderbufferStorageMultisample(
+                    GL_RENDERBUFFER,
+                    fb.samples,
+                    col.internal,
+                    fb.width,
+                    fb.height
+                );
 
-                glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                                          GL_RENDERBUFFER, rbo);
+                glFramebufferRenderbuffer(
+                    GL_FRAMEBUFFER,
+                    GL_COLOR_ATTACHMENT0,
+                    GL_RENDERBUFFER,
+                    fb.colorAttachmentMS
+                );
+
                 glBindRenderbuffer(GL_RENDERBUFFER, 0);
             }
         }
         else
         {
-            // Single-sample color
+            // Single-sample color.
             if (fb.bColorIsTexture)
             {
                 glGenTextures(1, &fb.colorAttachment);
                 glBindTexture(GL_TEXTURE_2D, fb.colorAttachment);
 
-                glTexImage2D(GL_TEXTURE_2D, 0, col.internal, fb.width, fb.height, 0,
-                             col.external, col.type, nullptr);
+                glTexImage2D(
+                    GL_TEXTURE_2D,
+                    0,
+                    col.internal,
+                    fb.width,
+                    fb.height,
+                    0,
+                    col.external,
+                    col.type,
+                    nullptr
+                );
 
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                                       GL_TEXTURE_2D, fb.colorAttachment, 0);
+                glFramebufferTexture2D(
+                    GL_FRAMEBUFFER,
+                    GL_COLOR_ATTACHMENT0,
+                    GL_TEXTURE_2D,
+                    fb.colorAttachment,
+                    0
+                );
 
                 fb.colorTarget = GL_TEXTURE_2D;
 
-                // Engine-visible handle so you can sample it in post
-                fb.colorTexHandle = RegisterTextureFromGL(fb.colorAttachment, GL_TEXTURE_2D, true);
+                fb.colorTexHandle = RegisterTextureFromGL(
+                    fb.colorAttachment,
+                    GL_TEXTURE_2D,
+                    true
+                );
 
                 glBindTexture(GL_TEXTURE_2D, 0);
             }
             else
             {
-                GLuint rbo = 0;
-                glGenRenderbuffers(1, &rbo);
-                fb.colorAttachment = rbo;
+                glGenRenderbuffers(1, &fb.colorAttachment);
+                glBindRenderbuffer(GL_RENDERBUFFER, fb.colorAttachment);
 
-                glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-                glRenderbufferStorage(GL_RENDERBUFFER, col.internal, fb.width, fb.height);
+                glRenderbufferStorage(
+                    GL_RENDERBUFFER,
+                    col.internal,
+                    fb.width,
+                    fb.height
+                );
 
-                glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                                          GL_RENDERBUFFER, rbo);
+                glFramebufferRenderbuffer(
+                    GL_FRAMEBUFFER,
+                    GL_COLOR_ATTACHMENT0,
+                    GL_RENDERBUFFER,
+                    fb.colorAttachment
+                );
 
                 glBindRenderbuffer(GL_RENDERBUFFER, 0);
             }
         }
     }
 
-    // -------------------------
-    // Depth / Stencil attachment
-    // -------------------------
+    // Depth-stencil attachment.
+
     if (framebufferData.depthMode != EDepthMode::None)
     {
-        if (fb.bDepthIsTexture && fb.samples == 1)
+        const GLenum depthAttachment = dep.hasStencil
+            ? GL_DEPTH_STENCIL_ATTACHMENT
+            : GL_DEPTH_ATTACHMENT;
+
+        if (sharedDepthStencilStorage)
         {
+            // Attach existing shared depth-stencil storage.
+            fb.depthStencilStorage = sharedDepthStencilStorage;
+            fb.depthStencil = sharedDepthStencilStorage->renderbuffer;
+
+            glFramebufferRenderbuffer(
+                GL_FRAMEBUFFER,
+                depthAttachment,
+                GL_RENDERBUFFER,
+                fb.depthStencil
+            );
+        }
+        else if (fb.bDepthIsTexture)
+        {
+            // Single-sample depth texture.
+            GLenum depthFormat = GL_DEPTH_COMPONENT;
+            GLenum depthType = GL_UNSIGNED_SHORT;
+
+            switch (framebufferData.depthMode)
+            {
+                case EDepthMode::D24S8:
+                    depthFormat = GL_DEPTH_STENCIL;
+                    depthType = GL_UNSIGNED_INT_24_8;
+                    break;
+
+                case EDepthMode::D32F:
+                    depthFormat = GL_DEPTH_COMPONENT;
+                    depthType = GL_FLOAT;
+                    break;
+
+                case EDepthMode::DepthOnly16:
+                    depthFormat = GL_DEPTH_COMPONENT;
+                    depthType = GL_UNSIGNED_SHORT;
+                    break;
+
+                default:
+                    cleanup();
+                    return {};
+            }
+
             glGenTextures(1, &fb.depthStencil);
             glBindTexture(GL_TEXTURE_2D, fb.depthStencil);
 
-            glTexImage2D(GL_TEXTURE_2D, 0, dep.internal, fb.width, fb.height, 0,
-                         dep.external, dep.type, nullptr);
+            glTexImage2D(
+                GL_TEXTURE_2D,
+                0,
+                dep.internal,
+                fb.width,
+                fb.height,
+                0,
+                depthFormat,
+                depthType,
+                nullptr
+            );
 
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
 
-            const GLenum attach = dep.hasStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
-            glFramebufferTexture2D(GL_FRAMEBUFFER, attach, GL_TEXTURE_2D, fb.depthStencil, 0);
+            glFramebufferTexture2D(
+                GL_FRAMEBUFFER,
+                depthAttachment,
+                GL_TEXTURE_2D,
+                fb.depthStencil,
+                0
+            );
 
-            fb.depthTexHandle = RegisterTextureFromGL(fb.depthStencil, GL_TEXTURE_2D, true);
+            fb.depthTexHandle = RegisterTextureFromGL(
+                fb.depthStencil,
+                GL_TEXTURE_2D,
+                true
+            );
 
             glBindTexture(GL_TEXTURE_2D, 0);
         }
         else
         {
+            // Create independently owned depth renderbuffer.
             glGenRenderbuffers(1, &fb.depthStencil);
+
+            if (!fb.depthStencil)
+            {
+                cleanup();
+                return {};
+            }
+
             glBindRenderbuffer(GL_RENDERBUFFER, fb.depthStencil);
 
             if (fb.samples > 1)
-                glRenderbufferStorageMultisample(GL_RENDERBUFFER, fb.samples, dep.internal, fb.width, fb.height);
+            {
+                glRenderbufferStorageMultisample(
+                    GL_RENDERBUFFER,
+                    fb.samples,
+                    dep.internal,
+                    fb.width,
+                    fb.height
+                );
+            }
             else
-                glRenderbufferStorage(GL_RENDERBUFFER, dep.internal, fb.width, fb.height);
+            {
+                glRenderbufferStorage(
+                    GL_RENDERBUFFER,
+                    dep.internal,
+                    fb.width,
+                    fb.height
+                );
+            }
 
-            const GLenum attach = dep.hasStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
-            glFramebufferRenderbuffer(GL_FRAMEBUFFER, attach, GL_RENDERBUFFER, fb.depthStencil);
+            glFramebufferRenderbuffer(
+                GL_FRAMEBUFFER,
+                depthAttachment,
+                GL_RENDERBUFFER,
+                fb.depthStencil
+            );
 
             glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+            // Transfer native renderbuffer ownership to shared storage.
+            auto storage = MakeShared<FGLDepthStencilStorage>();
+
+            storage->renderbuffer = fb.depthStencil;
+            storage->width = fb.width;
+            storage->height = fb.height;
+            storage->samples = fb.samples;
+            storage->internalFormat = dep.internal;
+            storage->depthMode = framebufferData.depthMode;
+            storage->bHasStencil = dep.hasStencil;
+
+            fb.depthStencilStorage = std::move(storage);
         }
     }
 
-    // -------------------------
-    // Validate
-    // -------------------------
+    // Validate framebuffer.
+
     const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+
     if (status != GL_FRAMEBUFFER_COMPLETE)
     {
-        std::cerr << "[GLBackend]: FBO incomplete: 0x" << std::hex << status << std::dec << "\n";
-        // Drop registered handles
-        if (fb.colorTexHandle.IsValid()) m_Textures.erase(fb.colorTexHandle);
-        if (fb.depthTexHandle.IsValid()) m_Textures.erase(fb.depthTexHandle);
+        std::cerr
+            << "[GLBackend]: FBO incomplete: 0x"
+            << std::hex << status << std::dec
+            << "\n";
 
-        // Delete color storage
-        if (fb.colorAttachment)
-        {
-            if (fb.samples == 1 && fb.bColorIsTexture) glDeleteTextures(1, &fb.colorAttachment);
-            else if (!fb.bColorIsTexture) glDeleteRenderbuffers(1, &fb.colorAttachment);
-        }
-        if (fb.colorAttachmentMS)
-        {
-            if (fb.samples > 1 && fb.bColorIsTexture) glDeleteTextures(1, &fb.colorAttachmentMS);
-            else glDeleteRenderbuffers(1, &fb.colorAttachmentMS);
-        }
-
-        // Delete depth storage
-        if (fb.depthStencil)
-        {
-            if (fb.bDepthIsTexture && fb.samples == 1) glDeleteTextures(1, &fb.depthStencil);
-            else glDeleteRenderbuffers(1, &fb.depthStencil);
-        }
-
-        if (fb.fbo) glDeleteFramebuffers(1, &fb.fbo);
+        cleanup();
         return {};
     }
 
-    RFramebufferHandle h{ NextId(m_NextID) };
-    m_Framebuffers[h] = fb;
-    return h;
+    // Register framebuffer.
+
+    RFramebufferHandle handle{ NextId(m_NextID) };
+
+    m_Framebuffers.emplace(handle, std::move(fb));
+
+    return handle;
 }
+
 
 void GLBackend::DestroyFramebuffer(RFramebufferHandle handle)
 {
     auto it = m_Framebuffers.find(handle);
-    if (it == m_Framebuffers.end()) return;
+    if (it == m_Framebuffers.end())
+        return;
 
-    FGLFramebuffer &fb = it->second;
+    FGLFramebuffer& fb = it->second;
 
-    // A later pop must never try to restore a framebuffer that has been deleted.
+    // A later pop must never restore a framebuffer that has been deleted.
     for (FFramebufferState& state : m_FramebufferStack)
     {
         if (state.drawFramebuffer == static_cast<GLint>(fb.fbo))
             state.drawFramebuffer = 0;
+
         if (state.readFramebuffer == static_cast<GLint>(fb.fbo))
             state.readFramebuffer = 0;
     }
 
-    // Drop engine-visible handles from the registry
-    if (fb.colorTexHandle.IsValid()) m_Textures.erase(fb.colorTexHandle);
-    if (fb.depthTexHandle.IsValid()) m_Textures.erase(fb.depthTexHandle);
+    // Remove engine-visible handles from the registry.
+    if (fb.colorTexHandle.IsValid())
+        m_Textures.erase(fb.colorTexHandle);
 
-    // Now delete the underlying GL objects
+    if (fb.depthTexHandle.IsValid())
+        m_Textures.erase(fb.depthTexHandle);
+
+    // Delete the framebuffer before releasing its attachments.
+    if (fb.fbo)
+        glDeleteFramebuffers(1, &fb.fbo);
+
+    // Delete color storage.
     if (fb.colorAttachment)
     {
-        if (fb.samples == 1 && fb.bColorIsTexture) glDeleteTextures(1, &fb.colorAttachment);
-        else if (!fb.bColorIsTexture) glDeleteRenderbuffers(1, &fb.colorAttachment);
+        if (fb.samples == 1 && fb.bColorIsTexture)
+            glDeleteTextures(1, &fb.colorAttachment);
+        else if (!fb.bColorIsTexture)
+            glDeleteRenderbuffers(1, &fb.colorAttachment);
     }
+
     if (fb.colorAttachmentMS)
     {
-        if (fb.samples > 1 && fb.bColorIsTexture) glDeleteTextures(1, &fb.colorAttachmentMS);
-        else glDeleteRenderbuffers(1, &fb.colorAttachmentMS);
+        if (fb.samples > 1 && fb.bColorIsTexture)
+            glDeleteTextures(1, &fb.colorAttachmentMS);
+        else
+            glDeleteRenderbuffers(1, &fb.colorAttachmentMS);
     }
+
+    // Delete depth texture, or unmanaged depth renderbuffer.
+    // Managed renderbuffers are released through shared ownership.
     if (fb.depthStencil)
     {
-        if (fb.bDepthIsTexture && fb.samples == 1) glDeleteTextures(1, &fb.depthStencil);
-        else glDeleteRenderbuffers(1, &fb.depthStencil);
+        if (fb.bDepthIsTexture && fb.samples == 1)
+            glDeleteTextures(1, &fb.depthStencil);
+        else if (!fb.depthStencilStorage)
+            glDeleteRenderbuffers(1, &fb.depthStencil);
     }
-    if (fb.fbo) glDeleteFramebuffers(1, &fb.fbo);
 
     m_Framebuffers.erase(it);
 }
@@ -1772,6 +2034,47 @@ void GLBackend::SetScissorRegion(int x, int y, int width, int height)
     const GLint scissorY = viewport[1] + viewport[3] - y - height;
 
     glScissor(scissorX, scissorY, width, height);
+}
+
+bool GLBackend::AttachSharedDepthStencil(FGLFramebuffer& framebuffer, const RFramebuffer& desc)
+{
+    if (!desc.sharedDepthStencilFramebuffer.IsValid())
+        return false;
+
+    if (desc.bDepthAsTexture || desc.depthMode != EDepthMode::D24S8)
+        return false;
+
+    const auto sourceIt = m_Framebuffers.find(desc.sharedDepthStencilFramebuffer);
+
+    if (sourceIt == m_Framebuffers.end())
+        return false;
+
+    const FGLFramebuffer& source = sourceIt->second;
+    const TSharedPtr<FGLDepthStencilStorage>& storage = source.depthStencilStorage;
+
+    if (!storage || !storage->renderbuffer)
+        return false;
+
+    if (!storage->bHasStencil || storage->depthMode != desc.depthMode)
+        return false;
+
+    if (storage->width != desc.width || storage->height != desc.height)
+        return false;
+
+    if (storage->samples != std::max(1, desc.samples))
+        return false;
+
+    glFramebufferRenderbuffer(
+        GL_FRAMEBUFFER,
+        GL_DEPTH_STENCIL_ATTACHMENT,
+        GL_RENDERBUFFER,
+        storage->renderbuffer
+    );
+
+    framebuffer.depthStencil = storage->renderbuffer;
+    framebuffer.depthStencilStorage = storage;
+
+    return true;
 }
 
 void GLBackend::SubmitMesh(RMeshHandle mesh, RShaderHandle shader, const FMatrix4 &transform)

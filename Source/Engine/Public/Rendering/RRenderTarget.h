@@ -39,8 +39,14 @@ struct FRenderTargetDesc
     int sampleCount = 1;
     bool bHasDepthStencil = false;
 
+    // Optional Silverware render target whose depth-stencil attachment is shared.
+    RRenderTargetHandle sharedDepthStencilTarget{};
+
     [[nodiscard]] bool IsValid() const noexcept
     {
-        return width > 0 && height > 0 && sampleCount > 0;
+        return width > 0 &&
+               height > 0 &&
+               sampleCount > 0 &&
+               (!sharedDepthStencilTarget.IsValid() || bHasDepthStencil);
     }
 };

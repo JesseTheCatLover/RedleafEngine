@@ -331,10 +331,25 @@ Silverware::FRenderTargetHandle SilverwareRenderingContext::CreateRenderTarget(
         return {};
 
     ::FRenderTargetDesc renderTargetDesc{};
+
     renderTargetDesc.width = desc.width;
     renderTargetDesc.height = desc.height;
     renderTargetDesc.sampleCount = desc.sampleCount;
     renderTargetDesc.bHasDepthStencil = desc.bHasDepthStencil;
+
+    // Translate Silverware's handle into Redleaf's render-target handle.
+    if (desc.sharedDepthStencilTarget.IsValid())
+    {
+        if (!desc.bHasDepthStencil)
+            return {};
+
+        const auto sharedIt = m_RenderTargets.find(desc.sharedDepthStencilTarget.Value);
+
+        if (sharedIt == m_RenderTargets.end())
+            return {};
+
+        renderTargetDesc.sharedDepthStencilTarget = sharedIt->second.resource;
+    }
 
     const RRenderTargetHandle resource = m_RenderDevice.CreateRenderTarget(renderTargetDesc);
 
@@ -343,12 +358,18 @@ Silverware::FRenderTargetHandle SilverwareRenderingContext::CreateRenderTarget(
 
     const std::uint64_t id = m_NextRenderTargetHandle++;
 
-    m_RenderTargets.emplace(id, FRenderTargetEntry{
-        resource,
-        {},
-        desc.width,
-        desc.height
-    });
+    if (!m_RenderTargets.emplace(
+        id,
+        FRenderTargetEntry{
+            resource,
+            {},
+            desc.width,
+            desc.height
+        }).second)
+    {
+        m_RenderDevice.DestroyRenderTarget(resource);
+        return {};
+    }
 
     return { id };
 }
