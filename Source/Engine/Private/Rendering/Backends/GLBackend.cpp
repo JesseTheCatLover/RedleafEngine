@@ -1220,10 +1220,12 @@ void GLBackend::ClearFramebuffer(const FRenderClearDesc& desc)
         glEnable(GL_SCISSOR_TEST);
 }
 
+
 bool GLBackend::PushRenderState()
 {
     FRenderState state{};
 
+    // Blend
     state.bBlendEnabled = glIsEnabled(GL_BLEND);
 
     glGetIntegerv(GL_BLEND_SRC_RGB, &state.blendSrcRGB);
@@ -1231,21 +1233,54 @@ bool GLBackend::PushRenderState()
     glGetIntegerv(GL_BLEND_SRC_ALPHA, &state.blendSrcAlpha);
     glGetIntegerv(GL_BLEND_DST_ALPHA, &state.blendDstAlpha);
 
+    // Depth
     state.bDepthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
+
     glGetBooleanv(GL_DEPTH_WRITEMASK, &state.bDepthWriteEnabled);
     glGetIntegerv(GL_DEPTH_FUNC, &state.depthFunction);
 
+    // Culling
     state.bCullEnabled = glIsEnabled(GL_CULL_FACE);
+
     glGetIntegerv(GL_CULL_FACE_MODE, &state.cullFaceMode);
 
+    // Color write mask
     glGetBooleanv(GL_COLOR_WRITEMASK, state.colorWriteMask);
 
+    // Scissor
+    state.bScissorEnabled = glIsEnabled(GL_SCISSOR_TEST);
+    glGetIntegerv(GL_SCISSOR_BOX, state.scissorBox);
+
+    // Stencil
+    state.bStencilEnabled = glIsEnabled(GL_STENCIL_TEST);
+
+    // Front face
+    glGetIntegerv(GL_STENCIL_FUNC, &state.stencilFront.function);
+    glGetIntegerv(GL_STENCIL_REF, &state.stencilFront.reference);
+    glGetIntegerv(GL_STENCIL_VALUE_MASK, &state.stencilFront.valueMask);
+    glGetIntegerv(GL_STENCIL_WRITEMASK, &state.stencilFront.writeMask);
+
+    glGetIntegerv(GL_STENCIL_FAIL, &state.stencilFront.stencilFail);
+    glGetIntegerv(GL_STENCIL_PASS_DEPTH_FAIL, &state.stencilFront.depthFail);
+    glGetIntegerv(GL_STENCIL_PASS_DEPTH_PASS, &state.stencilFront.depthPass);
+
+    // Back face
+    glGetIntegerv(GL_STENCIL_BACK_FUNC, &state.stencilBack.function);
+    glGetIntegerv(GL_STENCIL_BACK_REF, &state.stencilBack.reference);
+    glGetIntegerv(GL_STENCIL_BACK_VALUE_MASK, &state.stencilBack.valueMask);
+    glGetIntegerv(GL_STENCIL_BACK_WRITEMASK, &state.stencilBack.writeMask);
+
+    glGetIntegerv(GL_STENCIL_BACK_FAIL, &state.stencilBack.stencilFail);
+    glGetIntegerv(GL_STENCIL_BACK_PASS_DEPTH_FAIL, &state.stencilBack.depthFail);
+    glGetIntegerv(GL_STENCIL_BACK_PASS_DEPTH_PASS, &state.stencilBack.depthPass);
+
+    // Shader and vertex array
     glGetIntegerv(GL_CURRENT_PROGRAM, &state.currentProgram);
     glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &state.vertexArray);
 
+    // Texture unit 0
     glGetIntegerv(GL_ACTIVE_TEXTURE, &state.activeTexture);
 
-    // Our fullscreen rendering operations bind their input on texture unit 0.
     glActiveTexture(GL_TEXTURE0);
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &state.texture2DBindingUnit0);
     glActiveTexture(static_cast<GLenum>(state.activeTexture));
@@ -1253,6 +1288,7 @@ bool GLBackend::PushRenderState()
     m_RenderStateStack.push_back(state);
     return true;
 }
+
 
 bool GLBackend::PopRenderState()
 {
@@ -1262,6 +1298,7 @@ bool GLBackend::PopRenderState()
     const FRenderState state = m_RenderStateStack.back();
     m_RenderStateStack.pop_back();
 
+    // Blend
     if (state.bBlendEnabled)
         glEnable(GL_BLEND);
     else
@@ -1273,6 +1310,7 @@ bool GLBackend::PopRenderState()
         static_cast<GLenum>(state.blendSrcAlpha),
         static_cast<GLenum>(state.blendDstAlpha));
 
+    // Depth
     if (state.bDepthTestEnabled)
         glEnable(GL_DEPTH_TEST);
     else
@@ -1281,6 +1319,7 @@ bool GLBackend::PopRenderState()
     glDepthMask(state.bDepthWriteEnabled);
     glDepthFunc(static_cast<GLenum>(state.depthFunction));
 
+    // Culling
     if (state.bCullEnabled)
         glEnable(GL_CULL_FACE);
     else
@@ -1288,16 +1327,73 @@ bool GLBackend::PopRenderState()
 
     glCullFace(static_cast<GLenum>(state.cullFaceMode));
 
+    // Color write mask
     glColorMask(
         state.colorWriteMask[0],
         state.colorWriteMask[1],
         state.colorWriteMask[2],
         state.colorWriteMask[3]);
 
+    // Scissor
+    glScissor(
+        state.scissorBox[0],
+        state.scissorBox[1],
+        state.scissorBox[2],
+        state.scissorBox[3]);
+
+    if (state.bScissorEnabled)
+        glEnable(GL_SCISSOR_TEST);
+    else
+        glDisable(GL_SCISSOR_TEST);
+
+    // Stencil: front face
+    glStencilFuncSeparate(
+        GL_FRONT,
+        static_cast<GLenum>(state.stencilFront.function),
+        state.stencilFront.reference,
+        static_cast<GLuint>(state.stencilFront.valueMask));
+
+    glStencilMaskSeparate(
+        GL_FRONT,
+        static_cast<GLuint>(state.stencilFront.writeMask));
+
+    glStencilOpSeparate(
+        GL_FRONT,
+        static_cast<GLenum>(state.stencilFront.stencilFail),
+        static_cast<GLenum>(state.stencilFront.depthFail),
+        static_cast<GLenum>(state.stencilFront.depthPass));
+
+    // Stencil: back face
+    glStencilFuncSeparate(
+        GL_BACK,
+        static_cast<GLenum>(state.stencilBack.function),
+        state.stencilBack.reference,
+        static_cast<GLuint>(state.stencilBack.valueMask));
+
+    glStencilMaskSeparate(
+        GL_BACK,
+        static_cast<GLuint>(state.stencilBack.writeMask));
+
+    glStencilOpSeparate(
+        GL_BACK,
+        static_cast<GLenum>(state.stencilBack.stencilFail),
+        static_cast<GLenum>(state.stencilBack.depthFail),
+        static_cast<GLenum>(state.stencilBack.depthPass));
+
+    if (state.bStencilEnabled)
+        glEnable(GL_STENCIL_TEST);
+    else
+        glDisable(GL_STENCIL_TEST);
+
+    // Texture unit 0
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(state.texture2DBindingUnit0));
+    glBindTexture(
+        GL_TEXTURE_2D,
+        static_cast<GLuint>(state.texture2DBindingUnit0));
+
     glActiveTexture(static_cast<GLenum>(state.activeTexture));
 
+    // Shader and vertex array
     glBindVertexArray(static_cast<GLuint>(state.vertexArray));
     glUseProgram(static_cast<GLuint>(state.currentProgram));
 
