@@ -207,9 +207,7 @@ Silverware::FTextureHandle SilverwareRenderingContext::CreateTextureFromRenderTa
         height > target.height - y)
         return {};
 
-    const RTextureHandle resource =
-        m_RenderDevice.CreateTextureFromRenderTargetRegion(
-            target.resource, x, y, width, height);
+    const RTextureHandle resource = m_RenderDevice.CreateTextureFromRenderTargetRegion(target.resource, x, y, width, height);
 
     if (!resource.IsValid())
         return {};
@@ -326,14 +324,16 @@ void SilverwareRenderingContext::SetScissorRegion(int x, int y, int width, int h
     m_RenderDevice.SetScissorRegion(x, y, width, height);
 }
 
-Silverware::FRenderTargetHandle SilverwareRenderingContext::CreateRenderTarget(const Silverware::FRenderTargetDesc& desc)
+Silverware::FRenderTargetHandle SilverwareRenderingContext::CreateRenderTarget(
+    const Silverware::FRenderTargetDesc& desc)
 {
     if (!desc.IsValid() || m_NextRenderTargetHandle == 0)
         return {};
 
-    FRenderTargetDesc renderTargetDesc{};
+    ::FRenderTargetDesc renderTargetDesc{};
     renderTargetDesc.width = desc.width;
     renderTargetDesc.height = desc.height;
+    renderTargetDesc.sampleCount = desc.sampleCount;
     renderTargetDesc.bHasDepthStencil = desc.bHasDepthStencil;
 
     const RRenderTargetHandle resource = m_RenderDevice.CreateRenderTarget(renderTargetDesc);
@@ -350,7 +350,7 @@ Silverware::FRenderTargetHandle SilverwareRenderingContext::CreateRenderTarget(c
         desc.height
     });
 
-    return {id};
+    return { id };
 }
 
 void SilverwareRenderingContext::DestroyRenderTarget(Silverware::FRenderTargetHandle target)

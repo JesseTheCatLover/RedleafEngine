@@ -934,8 +934,8 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
 
     if (!AddText(*buttonPanel, "BUTTONS", "PanelTitle") ||
     !AddText(*buttonPanel, "Button interaction, focus and visual states.", "Body") ||
-    !AddText(*typographyPanel, "TEXT OVERFLOW", "PanelTitle") ||
-    !AddText(*typographyPanel, "Clipping, ellipsis and custom markers.", "Body"))
+    !AddText(*typographyPanel, "BOX OUTLINE", "PanelTitle") ||
+    !AddText(*typographyPanel, "Rounded strokes, line styles and offsets.", "Body"))
         return false;
 
     FWidgetLayout areaLayout;
@@ -957,9 +957,102 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
 
     std::vector<FTypographySample> typographySamples;
 
-    if (!m_ButtonPlayground || !typographyArea ||
-    !AddTextOverflowSamples(*typographyArea, typographySamples))
-    return false;
+    if (!m_ButtonPlayground || !typographyArea)
+        return false;
+
+        AddText(*typographyArea, "LINE STYLES", "PanelTitle");
+    AddText(*typographyArea, "Same geometry, different stroke patterns.", "Body");
+
+    const auto addOutlineSample = [](
+        ContainerWidget& parent,
+        const char* label,
+        const char* details,
+        EBorderStyle lineStyle,
+        float width,
+        float offset) -> bool
+    {
+        FWidgetLayout sampleLayout;
+        sampleLayout.width = FLayoutLength::Units(0.0f);
+        sampleLayout.height = FLayoutLength::Percent(100.0f);
+        sampleLayout.flexGrow = 1.0f;
+        SetPadding(sampleLayout, 10.0f, 10.0f, 10.0f, 10.0f);
+
+        ContainerWidget* sample = AddContainer(
+            parent,
+            nullptr,
+            sampleLayout,
+            MakeContainerLayout(
+                ELayoutDirection::Vertical,
+                4.0f,
+                EAlignment::Center,
+                EJustification::Center));
+
+        if (!sample)
+            return false;
+
+        FWidgetVisualStyle visualStyle;
+        visualStyle.backgroundColor = FColor{0.08f, 0.10f, 0.14f, 1.0f};
+        visualStyle.borderColor = FColor{0.32f, 0.39f, 0.49f, 1.0f};
+        visualStyle.borderWidth = 1.0f;
+        visualStyle.borderStyle = EBorderStyle::Solid;
+        visualStyle.cornerRadius = 10.0f;
+
+        sample->SetVisualStyle(visualStyle);
+
+        FBoxOutline outline;
+        outline.color = FColor{0.25f, 0.78f, 0.95f, 1.0f};
+        outline.width = width;
+        outline.style = lineStyle;
+        outline.offset = offset;
+
+        FWidgetEffectStyle effectStyle;
+        effectStyle.boxOutline = outline;
+
+        sample->SetEffectStyle(effectStyle);
+
+        return AddText(*sample, label, "PanelTitle") &&
+               AddText(*sample, details, "Mono");
+    };
+
+    // Primary comparison: identical dimensions and outline parameters.
+    FWidgetLayout lineStyleRowLayout;
+    lineStyleRowLayout.width = FLayoutLength::Percent(100.0f);
+    lineStyleRowLayout.height = FLayoutLength::Units(82.0f);
+
+    ContainerWidget* lineStyleRow = AddContainer(
+        *typographyArea,
+        nullptr,
+        lineStyleRowLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Horizontal,
+            30.0f,
+            EAlignment::Center));
+
+    if (!lineStyleRow ||
+        !addOutlineSample(*lineStyleRow, "SOLID", "3dp / +4dp",
+            EBorderStyle::Solid, 3.0f, 4.0f) ||
+        !addOutlineSample(*lineStyleRow, "DASHED", "3dp / +4dp",
+            EBorderStyle::Dashed, 3.0f, 4.0f) ||
+        !addOutlineSample(*lineStyleRow, "DOTTED", "3dp / +4dp",
+            EBorderStyle::Dotted, 3.0f, 4.0f))
+        return false;
+
+    // Secondary comparison: thickness and offset variations.
+    ContainerWidget* outlineVariationRow = AddContainer(
+        *typographyArea,
+        nullptr,
+        lineStyleRowLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Horizontal,
+            12.0f,
+            EAlignment::Center));
+
+    if (!outlineVariationRow ||
+        !addOutlineSample(*outlineVariationRow, "THICK SOLID", "6dp / +2dp",
+            EBorderStyle::Solid, 6.0f, 2.0f) ||
+        !addOutlineSample(*outlineVariationRow, "INSET DOTTED", "3dp / -3dp",
+            EBorderStyle::Dotted, 3.0f, -3.0f))
+        return false;
 
     // Rich content button
     FWidgetLayout buttonLayout;
@@ -979,6 +1072,17 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
 
     if (!richButton)
         return false;
+
+    FBoxOutline outline;
+    outline.color = FColor{0.25f, 0.78f, 0.95f, 1.0f};
+    outline.width = 4.f;
+    outline.style = EBorderStyle::Solid;
+    outline.offset = 4.f;
+
+    FWidgetEffectStyle effectStyle;
+    effectStyle.boxOutline = outline;
+
+    richButton->SetEffectStyle(effectStyle);
 
     FWidgetTransformStyle transformStyle;
 

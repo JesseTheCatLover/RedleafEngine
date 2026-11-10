@@ -36,10 +36,11 @@ struct FRenderTargetDesc
 
     ERenderTargetColorFormat colorFormat = ERenderTargetColorFormat::RGBA8;
 
+    int sampleCount = 1;
     bool bHasDepthStencil = false;
 
     [[nodiscard]] bool IsValid() const noexcept
     {
-        return width > 0 && height > 0;
+        return width > 0 && height > 0 && sampleCount > 0;
     }
 };

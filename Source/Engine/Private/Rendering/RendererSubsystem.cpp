@@ -1146,13 +1146,18 @@ void RendererSubsystem::EnsureTargets(int w, int h, int samples)
     }
 }
 
-void RendererSubsystem::DestroyTarget(FTarget &t)
+void RendererSubsystem::DestroyTarget(FTarget& t)
 {
-    if (t.fbo.IsValid()) m_Backend->DestroyFramebuffer(t.fbo);
-    t = {}; // backend should have invalidated the exported handles
+    if (t.fbo.IsValid())
+        m_Backend->DestroyFramebuffer(t.fbo);
+
+    if (t.resolveFbo.IsValid())
+        m_Backend->DestroyFramebuffer(t.resolveFbo);
+
+    t = {};
 }
 
-void RendererSubsystem::BuildTarget(FTarget& t, int w, int h, int samples, bool withDepth, bool hdr, bool srgb)
+void RendererSubsystem::BuildTarget(FTarget& t, int w, int h, int samples, bool withDepth, bool hdr, bool bSrgb)
 {
     // Describe the framebuffer; the backend owns its attachments.
     RFramebuffer fb{};
@@ -1161,10 +1166,10 @@ void RendererSubsystem::BuildTarget(FTarget& t, int w, int h, int samples, bool 
     fb.samples = std::max(1, samples);
 
     fb.bHasColor = true;
-    fb.bColorAsTexture = true;
+    fb.bColorAsTexture = fb.samples == 1;
     fb.bDepthAsTexture = withDepth && fb.samples == 1;
 
-    fb.colorMode = srgb ? EColorMode::sRGB8_A8 : hdr ? EColorMode::HDR16F : EColorMode::LDR8;
+    fb.colorMode = bSrgb ? EColorMode::sRGB8_A8 : hdr ? EColorMode::HDR16F : EColorMode::LDR8;
     fb.depthMode = withDepth ? EDepthMode::D24S8 : EDepthMode::None;
 
     t.fbo = m_Backend->CreateFramebuffer(fb);
@@ -1172,16 +1177,20 @@ void RendererSubsystem::BuildTarget(FTarget& t, int w, int h, int samples, bool 
         return;
 
     // Retrieve handles for the framebuffer attachments.
-    t.color = m_Backend->GetFramebufferColorTexture(t.fbo);
+    if (fb.samples == 1)
+    {
+        t.color = m_Backend->GetFramebufferColorTexture(t.fbo);
 
-    if (fb.bDepthAsTexture)
-        t.depth = m_Backend->GetFramebufferDepthTexture(t.fbo);
+        if (fb.bDepthAsTexture)
+            t.depth = m_Backend->GetFramebufferDepthTexture(t.fbo);
+    }
 
     t.bHasDepthStencil = withDepth;
     t.w = w;
     t.h = h;
     t.samples = fb.samples;
 }
+
 void RendererSubsystem::BuildCustomTarget(FTarget& t, int w, int h)
 {
     RFramebuffer fb{};
@@ -2047,11 +2056,26 @@ RTextureHandle RendererSubsystem::CreateTextureFromRenderTargetRegion(RRenderTar
         height > target.h - y)
         return {};
 
+    // Resolve current multisampled contents before copying.
+    if (target.samples > 1 && target.resolveFbo.IsValid())
+    {
+        m_Backend->ResolveFramebuffer(
+            target.fbo,
+            target.resolveFbo,
+            IRenderBackend::EResolveMask::Color,
+            IRenderBackend::EResolveFilter::Nearest
+        );
+    }
+
+    const RFramebufferHandle sourceFbo = target.resolveFbo.IsValid()
+        ? target.resolveFbo
+        : target.fbo;
+
     // Convert top-left UI coordinates to framebuffer coordinates.
     const int sourceY = target.h - y - height;
 
     return m_Backend->CreateTextureFromFramebufferRegion(
-        target.fbo,
+        sourceFbo,
         x,
         sourceY,
         width,
@@ -2085,10 +2109,49 @@ RRenderTargetHandle RendererSubsystem::CreateRenderTarget(const FRenderTargetDes
 
     FTarget target{};
 
-    BuildTarget(target, desc.width, desc.height, 1,
-        desc.bHasDepthStencil, bHDR, bSRGB);
+    BuildTarget(
+        target,
+        desc.width,
+        desc.height,
+        desc.sampleCount,
+        desc.bHasDepthStencil,
+        bHDR,
+        bSRGB
+    );
 
-    if (!target.fbo.IsValid() || !target.color.IsValid())
+    if (!target.fbo.IsValid())
+    {
+        DestroyTarget(target);
+        return {};
+    }
+
+    if (target.samples > 1)
+    {
+        RFramebuffer resolve{};
+        resolve.width = desc.width;
+        resolve.height = desc.height;
+        resolve.samples = 1;
+
+        resolve.bHasColor = true;
+        resolve.bColorAsTexture = true;
+        resolve.bDepthAsTexture = false;
+
+        resolve.colorMode = bSRGB ? EColorMode::sRGB8_A8 : bHDR ? EColorMode::HDR16F : EColorMode::LDR8;
+
+        resolve.depthMode = EDepthMode::None;
+
+        target.resolveFbo = m_Backend->CreateFramebuffer(resolve);
+
+        if (!target.resolveFbo.IsValid())
+        {
+            DestroyTarget(target);
+            return {};
+        }
+
+        target.color = m_Backend->GetFramebufferColorTexture(target.resolveFbo);
+    }
+
+    if (!target.color.IsValid())
     {
         DestroyTarget(target);
         return {};
@@ -2169,10 +2232,30 @@ bool RendererSubsystem::PopRenderTarget()
     if (!m_Backend || m_RenderTargetStack.empty())
         return false;
 
+    const RRenderTargetHandle targetHandle = m_RenderTargetStack.back();
+
     if (!m_Backend->PopFramebuffer())
         return false;
 
     m_RenderTargetStack.pop_back();
+
+    const auto it = m_RenderTargets.find(targetHandle.id);
+
+    if (it != m_RenderTargets.end())
+    {
+        const FTarget& target = it->second;
+
+        if (target.samples > 1 && target.resolveFbo.IsValid())
+        {
+            m_Backend->ResolveFramebuffer(
+                target.fbo,
+                target.resolveFbo,
+                IRenderBackend::EResolveMask::Color,
+                IRenderBackend::EResolveFilter::Nearest
+            );
+        }
+    }
+
     return true;
 }
 
@@ -2214,6 +2297,25 @@ bool RendererSubsystem::CompositeRenderTargets(RRenderTargetHandle source, RRend
     if (destination.IsValid() && !m_RenderTargets.contains(destination.id))
         return false;
 
+    const FTarget& sourceTarget = sourceIt->second;
+
+    if (sourceTarget.samples > 1)
+    {
+        if (!sourceTarget.resolveFbo.IsValid())
+            return false;
+
+        m_Backend->ResolveFramebuffer(
+            sourceTarget.fbo,
+            sourceTarget.resolveFbo,
+            IRenderBackend::EResolveMask::Color,
+            IRenderBackend::EResolveFilter::Nearest
+        );
+    }
+
+    const RTextureHandle sourceTexture = sourceTarget.color;
+    const int sourceWidth = sourceTarget.w;
+    const int sourceHeight = sourceTarget.h;
+
     switch (blendMode)
     {
         case ERenderTargetBlendMode::Blend:
@@ -2223,10 +2325,6 @@ bool RendererSubsystem::CompositeRenderTargets(RRenderTargetHandle source, RRend
         default:
             return false;
     }
-
-    const RTextureHandle sourceTexture = sourceIt->second.color;
-    const int sourceWidth = sourceIt->second.w;
-    const int sourceHeight = sourceIt->second.h;
 
     if (!m_Backend->PushRenderState())
         return false;

@@ -115,9 +115,15 @@ private:
     struct FTarget
     {
         RFramebufferHandle fbo{};
+        RFramebufferHandle resolveFbo{};
+
         RTextureHandle color{};
         RTextureHandle depth{};
-        int w = 0, h = 0, samples = 1;
+
+        int w = 0;
+        int h = 0;
+        int samples = 1;
+
         bool bHasDepthStencil = false;
     };
 
@@ -154,7 +160,7 @@ private:
 
     void EnsureTargets(int w, int h, int samples);
     void DestroyTarget(FTarget& t);
-    void BuildTarget(FTarget& t, int w, int h, int samples, bool withDepth = false, bool hdr = false, bool srgb = false);
+    void BuildTarget(FTarget& t, int w, int h, int samples, bool withDepth = false, bool hdr = false, bool bSrgb = false);
     void BuildCustomTarget(FTarget& t, int w, int h);
     RTextureHandle RunPostProcessChain(RTextureHandle sceneColor, int w, int h, uint32_t profileId,
         const FFramePostParams& frameParams);
