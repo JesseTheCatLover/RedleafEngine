@@ -80,6 +80,9 @@ bool GLFWWindow::Initialize()
     //     glfwMaximizeWindow(m_Window);
     // }
 
+    glfwGetWindowSize(m_Window, &m_State.width, &m_State.height);
+    glfwGetFramebufferSize(m_Window, &m_FramebufferWidth, &m_FramebufferHeight);
+
     m_State.nativeHandle  = m_Window;
     m_State.monitorHandle = monitor;
 
@@ -99,15 +102,18 @@ bool GLFWWindow::Initialize()
 
     // Framebuffer resize callback
     glfwSetFramebufferSizeCallback(
-        m_Window,
-        [](GLFWwindow* window, int width, int height)
-        {
-            auto* self = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(window));
-            if (!self) return;
+    m_Window,
+    [](GLFWwindow* window, int width, int height)
+    {
+        auto* self = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(window));
+        if (!self) return;
 
-            if (self->m_FramebufferResizeCallback)
-                self->m_FramebufferResizeCallback(width, height);
-        });
+        self->m_FramebufferWidth = width;
+        self->m_FramebufferHeight = height;
+
+        if (self->m_FramebufferResizeCallback)
+            self->m_FramebufferResizeCallback(width, height);
+    });
 
     // Window size callback
     glfwSetWindowSizeCallback(
@@ -640,5 +646,40 @@ void GLFWWindow::UpdateCursor()
         case ECursorMode::Disabled:
             glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
             break;
+    }
+}
+
+void GLFWWindow::PollSizeChanges()
+{
+    if (!m_Window)
+        return;
+
+    int windowWidth = 0;
+    int windowHeight = 0;
+
+    glfwGetWindowSize(m_Window, &windowWidth, &windowHeight);
+
+    if (windowWidth != m_State.width || windowHeight != m_State.height)
+    {
+        m_State.width = windowWidth;
+        m_State.height = windowHeight;
+
+        if (m_WindowResizeCallback)
+            m_WindowResizeCallback(windowWidth, windowHeight);
+    }
+
+    int framebufferWidth = 0;
+    int framebufferHeight = 0;
+
+    glfwGetFramebufferSize(m_Window, &framebufferWidth, &framebufferHeight);
+
+    if (framebufferWidth != m_FramebufferWidth ||
+        framebufferHeight != m_FramebufferHeight)
+    {
+        m_FramebufferWidth = framebufferWidth;
+        m_FramebufferHeight = framebufferHeight;
+
+        if (m_FramebufferResizeCallback)
+            m_FramebufferResizeCallback(framebufferWidth, framebufferHeight);
     }
 }

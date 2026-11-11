@@ -48,6 +48,10 @@ void EngineContext::SetFramebufferSize(int w, int h)
     // Clamp to a minimum of 1 to avoid zero-sized framebuffers (aspect-ratio divisions)
     m_SurfaceContext->width = std::max(1, w);
     m_SurfaceContext->height = std::max(1, h);
+
+    m_SurfaceContext->aspectRatio =
+        static_cast<float>(m_SurfaceContext->width) /
+        static_cast<float>(m_SurfaceContext->height);
 }
 
 bool EngineContext::GetIsSurfaceFullscreen()

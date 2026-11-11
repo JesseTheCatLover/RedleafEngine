@@ -32,6 +32,8 @@ private:
     int m_WindowedY = 0;
     int m_WindowedWidth = 0;
     int m_WindowedHeight = 0;
+    int m_FramebufferWidth = 0;
+    int m_FramebufferHeight = 0;
 
     bool m_bHasSavedWindowedGeometry = false;
 
@@ -101,4 +103,6 @@ public:
 private:
     // Internal helper
     void UpdateCursor();
+
+    void PollSizeChanges();
 };

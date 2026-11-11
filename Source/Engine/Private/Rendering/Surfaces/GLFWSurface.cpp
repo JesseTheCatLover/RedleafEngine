@@ -304,6 +304,12 @@ void GLFWSurface::SwapBuffers(const TSharedPtr<IPlatformWindow>& window)
 void GLFWSurface::PollSurfaceEvents()
 {
     glfwPollEvents();
+
+    for (const auto& window : m_Windows)
+    {
+        if (window)
+            window->PollSizeChanges();
+    }
 }
 
 float GLFWSurface::GetTimeSeconds()
