@@ -163,7 +163,7 @@ private:
     void EnsureTargets(int w, int h, int samples);
     void DestroyTarget(FTarget& t);
     void BuildTarget(FTarget& t, int w, int h, int samples, bool withDepth = false, bool hdr = false, bool bSrgb = false,
-        RFramebufferHandle sharedDepthStencilFramebuffer = {});
+        RFramebufferHandle sharedDepthStencilFramebuffer = {}, bool bAllowDepthTexture = true);
     void BuildCustomTarget(FTarget& t, int w, int h);
     bool ResolveRenderTargetIfDirty(RRenderTargetHandle target) const;
     void MarkRenderTargetDirty(RRenderTargetHandle target);

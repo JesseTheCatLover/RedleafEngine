@@ -1158,7 +1158,7 @@ void RendererSubsystem::DestroyTarget(FTarget& t)
 }
 
 void RendererSubsystem::BuildTarget(FTarget& t, int w, int h, int samples, bool withDepth, bool hdr, bool bSrgb,
-    RFramebufferHandle sharedDepthStencilFramebuffer)
+    RFramebufferHandle sharedDepthStencilFramebuffer, bool bAllowDepthTexture)
 {
     // Describe the framebuffer; the backend owns its attachments.
     RFramebuffer fb{};
@@ -1168,12 +1168,15 @@ void RendererSubsystem::BuildTarget(FTarget& t, int w, int h, int samples, bool 
 
     fb.bHasColor = true;
     fb.bColorAsTexture = fb.samples == 1;
-    fb.bDepthAsTexture = withDepth && fb.samples == 1;
+
+    fb.bDepthAsTexture = withDepth &&
+                         fb.samples == 1 &&
+                         bAllowDepthTexture &&
+                         !sharedDepthStencilFramebuffer.IsValid();
 
     fb.colorMode = bSrgb ? EColorMode::sRGB8_A8 : hdr ? EColorMode::HDR16F : EColorMode::LDR8;
     fb.depthMode = withDepth ? EDepthMode::D24S8 : EDepthMode::None;
 
-    fb.bDepthAsTexture = withDepth && fb.samples == 1 && !sharedDepthStencilFramebuffer.IsValid();
     fb.depthMode = withDepth ? EDepthMode::D24S8 : EDepthMode::None;
     fb.sharedDepthStencilFramebuffer = sharedDepthStencilFramebuffer;
 
@@ -2192,7 +2195,8 @@ RRenderTargetHandle RendererSubsystem::CreateRenderTarget(const FRenderTargetDes
         desc.bHasDepthStencil,
         bHDR,
         bSRGB,
-        sharedDepthStencilFramebuffer
+        sharedDepthStencilFramebuffer,
+        false
     );
 
     if (!target.fbo.IsValid())
