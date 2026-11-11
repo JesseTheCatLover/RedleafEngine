@@ -1073,16 +1073,6 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     if (!richButton)
         return false;
 
-    FBoxOutline outline;
-    outline.color = FColor{0.25f, 0.78f, 0.95f, 1.0f};
-    outline.width = 4.f;
-    outline.style = EBorderStyle::Solid;
-    outline.offset = 4.f;
-
-    FWidgetEffectStyle effectStyle;
-    effectStyle.boxOutline = outline;
-
-    richButton->SetEffectStyle(effectStyle);
 
     FWidgetTransformStyle transformStyle;
 

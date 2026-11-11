@@ -1219,6 +1219,55 @@ void RendererSubsystem::BuildCustomTarget(FTarget& t, int w, int h)
 }
 
 
+bool RendererSubsystem::ResolveRenderTargetIfDirty(RRenderTargetHandle target) const
+{
+    if (!m_Backend || !target.IsValid())
+        return false;
+
+    const auto it = m_RenderTargets.find(target.id);
+
+    if (it == m_RenderTargets.end())
+        return false;
+
+    const FTarget& renderTarget = it->second;
+
+    if (renderTarget.samples <= 1)
+        return true;
+
+    if (!renderTarget.resolveFbo.IsValid() || !renderTarget.color.IsValid())
+        return false;
+
+    if (!renderTarget.bResolveDirty)
+        return true;
+
+    m_Backend->ResolveFramebuffer(
+        renderTarget.fbo,
+        renderTarget.resolveFbo,
+        IRenderBackend::EResolveMask::Color,
+        IRenderBackend::EResolveFilter::Nearest
+    );
+
+    renderTarget.bResolveDirty = false;
+    return true;
+}
+
+
+void RendererSubsystem::MarkRenderTargetDirty(RRenderTargetHandle target)
+{
+    if (!target.IsValid())
+        return;
+
+    const auto it = m_RenderTargets.find(target.id);
+
+    if (it == m_RenderTargets.end())
+        return;
+
+    if (it->second.samples <= 1)
+        return;
+
+    it->second.bResolveDirty = true;
+}
+
 RTextureHandle RendererSubsystem::RunPostProcessChain(RTextureHandle sceneColor, int w, int h, uint32_t profileId,
                                                       const FFramePostParams& frameParams)
 {
@@ -2042,8 +2091,9 @@ void RendererSubsystem::DestroyTexture(RTextureHandle h)
     m_Backend->DestroyTexture(h);
 }
 
-RTextureHandle RendererSubsystem::CreateTextureFromRenderTargetRegion(RRenderTargetHandle source, int x, int y,
-    int width, int height)
+
+RTextureHandle RendererSubsystem::CreateTextureFromRenderTargetRegion(
+    RRenderTargetHandle source, int x, int y, int width, int height)
 {
     if (!m_Backend || !source.IsValid() ||
         x < 0 || y < 0 || width <= 0 || height <= 0)
@@ -2061,22 +2111,13 @@ RTextureHandle RendererSubsystem::CreateTextureFromRenderTargetRegion(RRenderTar
         height > target.h - y)
         return {};
 
-    // Resolve current multisampled contents before copying.
-    if (target.samples > 1 && target.resolveFbo.IsValid())
-    {
-        m_Backend->ResolveFramebuffer(
-            target.fbo,
-            target.resolveFbo,
-            IRenderBackend::EResolveMask::Color,
-            IRenderBackend::EResolveFilter::Nearest
-        );
-    }
+    if (!ResolveRenderTargetIfDirty(source))
+        return {};
 
     const RFramebufferHandle sourceFbo = target.resolveFbo.IsValid()
         ? target.resolveFbo
         : target.fbo;
 
-    // Convert top-left UI coordinates to framebuffer coordinates.
     const int sourceY = target.h - y - height;
 
     return m_Backend->CreateTextureFromFramebufferRegion(
@@ -2086,6 +2127,7 @@ RTextureHandle RendererSubsystem::CreateTextureFromRenderTargetRegion(RRenderTar
         width,
         height);
 }
+
 
 RRenderTargetHandle RendererSubsystem::CreateRenderTarget(const FRenderTargetDesc& desc)
 {
@@ -2226,8 +2268,7 @@ void RendererSubsystem::DestroyRenderTarget(RRenderTargetHandle target)
     m_RenderTargets.erase(it);
 }
 
-RTextureHandle RendererSubsystem::GetRenderTargetColorTexture(
-    RRenderTargetHandle target) const
+RTextureHandle RendererSubsystem::GetRenderTargetColorTexture(RRenderTargetHandle target) const
 {
     if (!target.IsValid())
         return RTextureHandle::Invalid();
@@ -2237,8 +2278,12 @@ RTextureHandle RendererSubsystem::GetRenderTargetColorTexture(
     if (it == m_RenderTargets.end())
         return RTextureHandle::Invalid();
 
+    if (!ResolveRenderTargetIfDirty(target))
+        return RTextureHandle::Invalid();
+
     return it->second.color;
 }
+
 
 bool RendererSubsystem::PushRenderTarget(RRenderTargetHandle target)
 {
@@ -2266,30 +2311,10 @@ bool RendererSubsystem::PopRenderTarget()
     if (!m_Backend || m_RenderTargetStack.empty())
         return false;
 
-    const RRenderTargetHandle targetHandle = m_RenderTargetStack.back();
-
     if (!m_Backend->PopFramebuffer())
         return false;
 
     m_RenderTargetStack.pop_back();
-
-    const auto it = m_RenderTargets.find(targetHandle.id);
-
-    if (it != m_RenderTargets.end())
-    {
-        const FTarget& target = it->second;
-
-        if (target.samples > 1 && target.resolveFbo.IsValid())
-        {
-            m_Backend->ResolveFramebuffer(
-                target.fbo,
-                target.resolveFbo,
-                IRenderBackend::EResolveMask::Color,
-                IRenderBackend::EResolveFilter::Nearest
-            );
-        }
-    }
-
     return true;
 }
 
@@ -2314,6 +2339,9 @@ bool RendererSubsystem::ClearRenderTarget(RRenderTargetHandle target, const FRen
 
     m_Backend->ClearFramebuffer(desc);
 
+    if (desc.bClearColor)
+        MarkRenderTargetDirty(target);
+
     return PopRenderTarget();
 }
 
@@ -2333,18 +2361,8 @@ bool RendererSubsystem::CompositeRenderTargets(RRenderTargetHandle source, RRend
 
     const FTarget& sourceTarget = sourceIt->second;
 
-    if (sourceTarget.samples > 1)
-    {
-        if (!sourceTarget.resolveFbo.IsValid())
-            return false;
-
-        m_Backend->ResolveFramebuffer(
-            sourceTarget.fbo,
-            sourceTarget.resolveFbo,
-            IRenderBackend::EResolveMask::Color,
-            IRenderBackend::EResolveFilter::Nearest
-        );
-    }
+    if (!ResolveRenderTargetIfDirty(source))
+        return false;
 
     const RTextureHandle sourceTexture = sourceTarget.color;
     const int sourceWidth = sourceTarget.w;
@@ -2502,6 +2520,10 @@ bool RendererSubsystem::CompositeRenderTargets(RRenderTargetHandle source, RRend
 
         // Deliberately preserve the active scissor and stencil tests.
         const bool bDrawSucceeded = DrawFullscreenTexture(texture);
+
+        if (bDrawSucceeded && target.IsValid())
+            MarkRenderTargetDirty(target);
+
         const bool bRestoreSucceeded = restoreTargets();
 
         return bDrawSucceeded && bRestoreSucceeded;
@@ -2642,6 +2664,9 @@ bool RendererSubsystem::ApplyFilter(
         output,
         ERenderTargetBlendMode::Replace);
 
+    if (succeeded)
+        succeeded = ResolveRenderTargetIfDirty(output);
+
     const float inverseWidth = 1.0f / static_cast<float>(width);
     const float inverseHeight = 1.0f / static_cast<float>(height);
 
@@ -2711,6 +2736,8 @@ bool RendererSubsystem::ApplyFilter(
             m_FSQuad,
             m_GaussianBlurShader,
             FMatrix4::Identity());
+
+        MarkRenderTargetDirty(destination);
 
         return PopRenderTarget();
     };
@@ -2785,6 +2812,8 @@ void RendererSubsystem::SubmitScreenSpaceGeometry(RMeshHandle mesh, RTextureHand
         m_Backend->BindTexture(texture, 0);
 
     m_Backend->SubmitMesh(mesh, m_UIGeometryShader, FMatrix4::Identity());
+    if (bWriteColor && !m_RenderTargetStack.empty())
+        MarkRenderTargetDirty(m_RenderTargetStack.back());
     m_Backend->SetColorWriteMask(true, true, true, true); // Restore color writes
 }
 
@@ -2869,6 +2898,9 @@ void RendererSubsystem::SubmitScreenSpaceGeometryWithShader(
     }
 
     m_Backend->SubmitMesh(mesh, shader, FMatrix4::Identity());
+
+    if (bWriteColor && !m_RenderTargetStack.empty())
+        MarkRenderTargetDirty(m_RenderTargetStack.back());
 
     // Preserve the existing UI submission behavior.
     m_Backend->SetColorWriteMask(true, true, true, true);

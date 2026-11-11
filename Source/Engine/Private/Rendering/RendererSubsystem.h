@@ -124,6 +124,8 @@ private:
         int h = 0;
         int samples = 1;
 
+        mutable bool bResolveDirty = false;
+
         bool bHasDepthStencil = false;
     };
 
@@ -163,6 +165,8 @@ private:
     void BuildTarget(FTarget& t, int w, int h, int samples, bool withDepth = false, bool hdr = false, bool bSrgb = false,
         RFramebufferHandle sharedDepthStencilFramebuffer = {});
     void BuildCustomTarget(FTarget& t, int w, int h);
+    bool ResolveRenderTargetIfDirty(RRenderTargetHandle target) const;
+    void MarkRenderTargetDirty(RRenderTargetHandle target);
     RTextureHandle RunPostProcessChain(RTextureHandle sceneColor, int w, int h, uint32_t profileId,
         const FFramePostParams& frameParams);
     void RenderSceneBatch(const FSceneBatch& batch);
