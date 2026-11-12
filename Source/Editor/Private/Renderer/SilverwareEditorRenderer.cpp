@@ -1129,8 +1129,8 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     };
 
     fontButtonVisualStyle.borderColor = FColor{0.48f, 0.59f, 0.72f, 0.65f};
-    fontButtonVisualStyle.borderWidth = 1.0f;
-    fontButtonVisualStyle.borderStyle = EBorderStyle::Solid;
+    fontButtonVisualStyle.borderWidth = 2.0f;
+    fontButtonVisualStyle.borderStyle = EBorderStyle::Dashed;
     fontButtonVisualStyle.cornerRadius = 7.0f;
 
     FWidgetVisualStyle inkBlueButtonStyle;
