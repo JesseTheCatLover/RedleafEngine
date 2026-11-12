@@ -873,27 +873,35 @@ void RendererSubsystem::EnsureGaussianBlurShader()
         uniform sampler2D u_Input;
         uniform float u_Sigma;
         uniform vec2 u_TexelOffset;
-        uniform vec2 u_TexCoordMin;
-        uniform vec2 u_TexCoordMax;
+        uniform vec2 u_OutputRegionMin;
+        uniform vec2 u_OutputRegionMax;
+
+        uniform vec2 u_SampleBoundsMin;
+        uniform vec2 u_SampleBoundsMax;
 
         const int MAX_BLUR_RADIUS = 32;
 
         void main()
         {
-            // Preserve pixels outside the requested region.
-            if (vUV.x < u_TexCoordMin.x ||
-                vUV.y < u_TexCoordMin.y ||
-                vUV.x > u_TexCoordMax.x ||
-                vUV.y > u_TexCoordMax.y)
+            // Preserve pixels outside the requested output region.
+            if (vUV.x < u_OutputRegionMin.x ||
+                vUV.y < u_OutputRegionMin.y ||
+                vUV.x > u_OutputRegionMax.x ||
+                vUV.y > u_OutputRegionMax.y)
             {
                 FragColor = texture(u_Input, vUV);
                 return;
             }
 
-            float sigma = max(u_Sigma, 0.0001);
-            int radius = min(
-                int(ceil(3.0 * sigma)),
-                MAX_BLUR_RADIUS);
+            if (u_Sigma <= 0.0)
+            {
+                FragColor = texture(u_Input, vUV);
+                return;
+            }
+
+            float sigma = min(u_Sigma, float(MAX_BLUR_RADIUS) / 3.0);
+
+            int radius = int(ceil(3.0 * sigma));
 
             vec4 color = texture(u_Input, vUV);
             float totalWeight = 1.0;
@@ -912,13 +920,13 @@ void RendererSubsystem::EnsureGaussianBlurShader()
 
                 vec2 positiveUV = clamp(
                     vUV + offset,
-                    u_TexCoordMin,
-                    u_TexCoordMax);
+                    u_SampleBoundsMin,
+                    u_SampleBoundsMax);
 
                 vec2 negativeUV = clamp(
                     vUV - offset,
-                    u_TexCoordMin,
-                    u_TexCoordMax);
+                    u_SampleBoundsMin,
+                    u_SampleBoundsMax);
 
                 color += texture(u_Input, positiveUV) * weight;
                 color += texture(u_Input, negativeUV) * weight;
@@ -2094,7 +2102,6 @@ void RendererSubsystem::DestroyTexture(RTextureHandle h)
     m_Backend->DestroyTexture(h);
 }
 
-
 RTextureHandle RendererSubsystem::CreateTextureFromRenderTargetRegion(
     RRenderTargetHandle source, int x, int y, int width, int height)
 {
@@ -2566,6 +2573,7 @@ bool RendererSubsystem::CompositeRenderTargets(RRenderTargetHandle source, RRend
     return bSucceeded && bStateRestored;
 }
 
+
 bool RendererSubsystem::ApplyFilter(
     RRenderTargetHandle source,
     RRenderTargetHandle output,
@@ -2586,6 +2594,9 @@ bool RendererSubsystem::ApplyFilter(
 
     const int width = sourceTarget.w;
     const int height = sourceTarget.h;
+
+    if (!ResolveRenderTargetIfDirty(source))
+        return false;
 
     const RTextureHandle sourceTexture = sourceTarget.color;
 
@@ -2637,11 +2648,11 @@ bool RendererSubsystem::ApplyFilter(
         scratchIt == m_RenderTargets.end())
         return false;
 
-    const RTextureHandle outputTexture = outputAfterScratchIt->second.color;
-    const RTextureHandle scratchTexture = scratchIt->second.color;
-
-    if (!outputTexture.IsValid() || !scratchTexture.IsValid())
+    if (!outputAfterScratchIt->second.color.IsValid() ||
+        !scratchIt->second.color.IsValid())
         return false;
+
+    const RTextureHandle scratchTexture = scratchIt->second.color;
 
     if (scratchIt->second.bHasDepthStencil)
         return false;
@@ -2662,35 +2673,60 @@ bool RendererSubsystem::ApplyFilter(
     disabledStencil.bEnable = false;
     m_Backend->SetStencilState(disabledStencil);
 
-    // Seed output with the original source image.
-    bool succeeded = CompositeRenderTargets(
-        source,
-        output,
-        ERenderTargetBlendMode::Replace);
+    bool succeeded = true;
 
-    if (succeeded)
-        succeeded = ResolveRenderTargetIfDirty(output);
+    constexpr int MaxBlurRadius = 32;
+    constexpr float MaxBlurSigma = static_cast<float>(MaxBlurRadius) / 3.0f;
+
+    const float sigma = std::min(filter.sigma, MaxBlurSigma);
+    const int blurRadius = static_cast<int>(std::ceil(3.0f * sigma));
 
     const float inverseWidth = 1.0f / static_cast<float>(width);
     const float inverseHeight = 1.0f / static_cast<float>(height);
 
-    // Convert the top-left UI region to bottom-left texture coordinates.
-    const int bottom = height - region.y - region.height;
+    // Expand horizontally so the vertical pass produces valid
+    // neighboring samples for the subsequent horizontal pass.
+    FRenderTargetRegion verticalPassRegion = region;
 
-    const float regionMin[] = {
-        (static_cast<float>(region.x) + 0.5f) * inverseWidth,
-        (static_cast<float>(bottom) + 0.5f) * inverseHeight
+    verticalPassRegion.x = std::max(0, region.x - blurRadius);
+
+    const int regionRight = region.x + region.width;
+    const int expandedRight =
+        regionRight + std::min(blurRadius, width - regionRight);
+
+    verticalPassRegion.width = expandedRight - verticalPassRegion.x;
+
+    // Valid texture sampling bounds, represented by pixel centers.
+    const float sampleBoundsMin[] = {
+        0.5f * inverseWidth,
+        0.5f * inverseHeight
     };
 
-    const float regionMax[] = {
-        (static_cast<float>(region.x + region.width) - 0.5f) * inverseWidth,
-        (static_cast<float>(bottom + region.height) - 0.5f) * inverseHeight
+    const float sampleBoundsMax[] = {
+        1.0f - sampleBoundsMin[0],
+        1.0f - sampleBoundsMin[1]
     };
 
-    auto drawBlurPass = [&](RTextureHandle input,
-                            RRenderTargetHandle destination,
-                            float directionX,
-                            float directionY) -> bool
+    const auto calculateRegionBounds = [&](const FRenderTargetRegion& outputRegion,
+                                           float* outMin,
+                                           float* outMax)
+    {
+        const int bottom = height - outputRegion.y - outputRegion.height;
+
+        outMin[0] = (static_cast<float>(outputRegion.x) + 0.5f) * inverseWidth;
+
+        outMin[1] = (static_cast<float>(bottom) + 0.5f) * inverseHeight;
+
+        outMax[0] = (static_cast<float>(outputRegion.x + outputRegion.width) - 0.5f) * inverseWidth;
+
+        outMax[1] = (static_cast<float>(bottom + outputRegion.height) - 0.5f) * inverseHeight;
+    };
+
+    const auto drawBlurPass = [&](RTextureHandle input,
+                                  RRenderTargetHandle destination,
+                                  float directionX,
+                                  float directionY,
+                                  const FRenderTargetRegion& outputRegion) -> bool
     {
         if (!PushRenderTarget(destination))
             return false;
@@ -2712,12 +2748,17 @@ bool RendererSubsystem::ApplyFilter(
         m_Backend->BindShader(m_GaussianBlurShader);
 
         m_Backend->SetUniformInt(m_GaussianBlurShader, "u_Input", 0);
-        m_Backend->SetUniformFloat(m_GaussianBlurShader, "u_Sigma", filter.sigma);
+        m_Backend->SetUniformFloat(m_GaussianBlurShader, "u_Sigma", sigma);
 
         const float texelOffset[] = {
             directionX * inverseWidth,
             directionY * inverseHeight
         };
+
+        float outputRegionMin[2]{};
+        float outputRegionMax[2]{};
+
+        calculateRegionBounds(outputRegion, outputRegionMin, outputRegionMax);
 
         m_Backend->SetUniformVec2(
             m_GaussianBlurShader,
@@ -2726,13 +2767,23 @@ bool RendererSubsystem::ApplyFilter(
 
         m_Backend->SetUniformVec2(
             m_GaussianBlurShader,
-            "u_TexCoordMin",
-            regionMin);
+            "u_OutputRegionMin",
+            outputRegionMin);
 
         m_Backend->SetUniformVec2(
             m_GaussianBlurShader,
-            "u_TexCoordMax",
-            regionMax);
+            "u_OutputRegionMax",
+            outputRegionMax);
+
+        m_Backend->SetUniformVec2(
+            m_GaussianBlurShader,
+            "u_SampleBoundsMin",
+            sampleBoundsMin);
+
+        m_Backend->SetUniformVec2(
+            m_GaussianBlurShader,
+            "u_SampleBoundsMax",
+            sampleBoundsMax);
 
         m_Backend->BindTexture(input, 0);
 
@@ -2746,24 +2797,28 @@ bool RendererSubsystem::ApplyFilter(
         return PopRenderTarget();
     };
 
-    // Pass 1: vertical blur, output -> scratch.
+    // Pass 1: vertical blur, source -> scratch.
+    // The shader preserves the source everywhere outside verticalPassRegion.
     if (succeeded)
     {
         succeeded = drawBlurPass(
-            outputTexture,
+            sourceTexture,
             scratch,
             0.0f,
-            1.0f);
+            1.0f,
+            verticalPassRegion);
     }
 
     // Pass 2: horizontal blur, scratch -> output.
+    // The shader preserves scratch everywhere outside the requested region.
     if (succeeded)
     {
         succeeded = drawBlurPass(
             scratchTexture,
             output,
             1.0f,
-            0.0f);
+            0.0f,
+            region);
     }
 
     const bool stateRestored = m_Backend->PopRenderState();
