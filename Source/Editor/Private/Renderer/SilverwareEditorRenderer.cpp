@@ -28,41 +28,6 @@ namespace
     constexpr char kDarkThemeID[] = "Redleaf.InkBlue.Dark";
     constexpr char kLightThemeID[] = "Redleaf.InkBlue.Light";
 
-    constexpr char kBaseStylesheetPath[] = "engine:/Editor/Stylesheets/InkBlue.Base.swstyle";
-    constexpr char kDarkStylesheetPath[] = "engine:/Editor/Stylesheets/InkBlue.Dark.swstyle";
-    constexpr char kLightStylesheetPath[] = "engine:/Editor/Stylesheets/InkBlue.Light.swstyle";
-
-    bool LoadPlaygroundStylesheet(
-        Silverware::SilverwareUIContext& context,
-        const char* virtualPath)
-    {
-        Silverware::FResourcePath path;
-
-        if (!Silverware::FResourcePath::TryParse(virtualPath, path))
-        {
-            std::cerr << "[SilverwareRenderer]: Invalid stylesheet path: "
-                      << virtualPath << '\n';
-            return false;
-        }
-
-        const Silverware::FStylesheetLoadResult result = context.LoadStylesheet(path);
-
-        if (!result.Succeeded())
-        {
-            std::cerr << "[SilverwareRenderer]: Failed to load stylesheet "
-                      << virtualPath << ": " << result.message;
-
-            if (result.status == Silverware::EStylesheetLoadStatus::ParseError)
-                std::cerr << " (line " << result.parseError.line
-                          << ", column " << result.parseError.column << ')';
-
-            std::cerr << '\n';
-            return false;
-        }
-
-        return true;
-    }
-
     constexpr char kPlaygroundThemeID[] = "Redleaf.SilverwarePlayground";
 
     struct FTypographySample
@@ -797,7 +762,7 @@ bool SilverwareEditorRenderer::Initialize(SilverwareBackend& backend)
     m_Backend = &backend;
     m_RootWidget = Silverware::MakeUnique<Silverware::ContainerWidget>();
 
-    if (!BuildPlaygroundLayout() || !RegisterPlaygroundTheme())
+    if (!BuildPlaygroundLayout())
     {
         std::cerr << "[SilverwareRenderer]: Failed to build the interaction playground.\n";
         Shutdown();
@@ -808,40 +773,6 @@ bool SilverwareEditorRenderer::Initialize(SilverwareBackend& backend)
     {
         std::cerr << "[SilverwareRenderer]: Initial synchronization failed.\n";
         Shutdown();
-        return false;
-    }
-
-    return true;
-}
-
-bool SilverwareEditorRenderer::RegisterPlaygroundTheme()
-{
-    if (!m_Backend)
-        return false;
-
-    Silverware::SilverwareUIContext* context = m_Backend->GetEditorUIContext();
-
-    if (!context)
-        return false;
-
-    // Register the base before its appearance themes.
-    if (!LoadPlaygroundStylesheet(*context, kBaseStylesheetPath) ||
-        !LoadPlaygroundStylesheet(*context, kDarkStylesheetPath) ||
-        !LoadPlaygroundStylesheet(*context, kLightStylesheetPath))
-        return false;
-
-    std::string error;
-
-    if (!m_Backend->RegisterTheme(MakePlaygroundTheme(), &error))
-    {
-        std::cerr << "[SilverwareRenderer]: Theme registration failed: " << error << '\n';
-        return false;
-    }
-
-    if (!m_Backend->SetActiveTheme(kDarkThemeID, &error))
-    {
-        std::cerr << "[SilverwareRenderer]: Failed to activate InkBlue Dark: "
-                  << error << '\n';
         return false;
     }
 
@@ -1340,11 +1271,6 @@ void SilverwareEditorRenderer::Shutdown()
     if (m_Backend && m_Backend->IsInitialized())
     {
         m_Backend->ClearActiveTheme();
-        (void)m_Backend->UnregisterTheme(kPlaygroundThemeID);
-        // Unregister children before their shared parent.
-        (void)m_Backend->UnregisterTheme(kDarkThemeID);
-        (void)m_Backend->UnregisterTheme(kLightThemeID);
-        (void)m_Backend->UnregisterTheme(kBaseThemeID);
     }
 
     m_PrimaryButtonClickConnection.Disconnect();

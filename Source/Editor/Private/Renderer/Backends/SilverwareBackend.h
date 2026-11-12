@@ -44,19 +44,17 @@ public:
 
     void Shutdown();
 
-    [[nodiscard]] bool Synchronize(Silverware::CoreWidget& root, Silverware::EBackendSyncMode mode);
+    [[nodiscard]] bool Synchronize(Silverware::CoreWidget &root, Silverware::EBackendSyncMode mode);
 
-    [[nodiscard]] bool RegisterTheme(Silverware::FThemeDefinition theme, std::string* outError = nullptr);
+    [[nodiscard]] Silverware::FStylesheetLoadResult LoadStylesheet(const Silverware::FResourcePath &path);
 
-    [[nodiscard]] bool RegisterStylesheet(std::string_view source,
-        Silverware::FStylesheetParseError* outParseError = nullptr,
-        std::string* outRegistrationError = nullptr);
+    [[nodiscard]] bool LoadTheme(Silverware::FThemeDefinition theme, std::string *outError = nullptr);
 
-    [[nodiscard]] bool UnregisterTheme(const Silverware::FThemeID& themeID, std::string* outError = nullptr);
+    [[nodiscard]] bool UnloadTheme(const Silverware::FThemeID &themeID, std::string *outError = nullptr);
 
-    [[nodiscard]] bool SetActiveTheme(Silverware::FThemeID themeID, std::string* outError = nullptr);
+    [[nodiscard]] bool SetActiveTheme(const Silverware::FThemeID &themeID, std::string *outError = nullptr);
 
-    void ClearActiveTheme() noexcept;
+void ClearActiveTheme() noexcept;
 
     [[nodiscard]] bool TryGetWidgetSize(const Silverware::CoreWidget& widget,float& outWidth, float& outHeight) const;
 

@@ -15,7 +15,6 @@ namespace Silverware
 class SilverwareEditorRenderer
 {
 private:
-    [[nodiscard]] bool RegisterPlaygroundTheme();
     [[nodiscard]] bool BuildPlaygroundLayout();
 
     SilverwareBackend* m_Backend = nullptr;

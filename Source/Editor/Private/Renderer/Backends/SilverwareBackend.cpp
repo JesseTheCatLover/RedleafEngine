@@ -27,6 +27,9 @@ namespace
 
     constexpr float kDefaultUIScale = 1.0f;
 
+    constexpr char kRedleafDarkStylesheet[] = "engine:/Editor/Stylesheets/Redleaf.InkBlue.Dark.swstyle";
+    constexpr char kRedleafDefaultThemeID[] = "Redleaf.InkBlue.Dark";
+
     float GetDisplayScale(const IPlatformWindow& window)
     {
         float xScale = 1.0f;
@@ -200,8 +203,7 @@ bool SilverwareBackend::InitializeRuntime(IPlatformWindow& window)
     }
 
     Silverware::FSilverwareHostConfig hostConfig;
-    hostConfig.backendRuntime =
-        MakeUnique<Silverware::Backends::RmlUi::RmlUiBackendRuntime>(TakeUniqueOwnership(backendConfig));
+    hostConfig.backendRuntime = MakeUnique<Silverware::Backends::RmlUi::RmlUiBackendRuntime>(TakeUniqueOwnership(backendConfig));
     hostConfig.resourceProvider = Silverware::TakeUniqueOwnership(m_ResourceProvider);
     hostConfig.fontRegistry = Silverware::TakeUniqueOwnership(m_FontRegistry);
 
@@ -246,6 +248,31 @@ bool SilverwareBackend::InitializeRuntime(IPlatformWindow& window)
     //           << ", effective=" << m_EditorUIContext->GetEffectiveScale()
     //           << '\n';
 
+    Silverware::FResourcePath path;
+
+    if (!Silverware::FResourcePath::TryParse(kRedleafDarkStylesheet, path))
+    {
+        std::cerr << "[SilverwareBackend]: Invalid stylesheet path: "
+                  << kRedleafDarkStylesheet << '\n';
+        return false;
+    }
+
+    const Silverware::FStylesheetLoadResult result = LoadStylesheet(path);
+
+    if (!result.Succeeded())
+    {
+        std::cerr << "[SilverwareBackend]: Failed to load stylesheet "
+                  << kRedleafDarkStylesheet << ": " << result.message << '\n';
+        return false;
+    }
+
+    if (!SetActiveTheme(kRedleafDefaultThemeID, &error))
+    {
+        std::cerr << "[SilverwareBackend]: Failed to activate the default editor theme: "
+                  << error << '\n';
+        return false;
+    }
+    
     return true;
 }
 
@@ -255,7 +282,18 @@ bool SilverwareBackend::Synchronize(Silverware::CoreWidget& root, Silverware::EB
         m_EditorUIContext->Synchronize(root, mode);
 }
 
-bool SilverwareBackend::RegisterTheme(Silverware::FThemeDefinition theme, std::string* outError)
+Silverware::FStylesheetLoadResult SilverwareBackend::LoadStylesheet(const Silverware::FResourcePath& path)
+{
+    if (m_EditorUIContext)
+        return m_EditorUIContext->LoadStylesheet(path);
+
+    Silverware::FStylesheetLoadResult result;
+    result.status = Silverware::EStylesheetLoadStatus::ResourceError;
+    result.message = "Editor UI context is unavailable.";
+    return result;
+}
+
+bool SilverwareBackend::LoadTheme(Silverware::FThemeDefinition theme, std::string* outError)
 {
     if (!m_EditorUIContext)
     {
@@ -265,27 +303,10 @@ bool SilverwareBackend::RegisterTheme(Silverware::FThemeDefinition theme, std::s
         return false;
     }
 
-    return m_EditorUIContext->RegisterTheme(Silverware::TakeUniqueOwnership(theme), outError);
+    return m_EditorUIContext->LoadTheme(std::move(theme), outError);
 }
 
-bool SilverwareBackend::RegisterStylesheet(
-    std::string_view source,
-    Silverware::FStylesheetParseError* outParseError,
-    std::string* outRegistrationError)
-{
-    if (!m_EditorUIContext)
-    {
-        if (outRegistrationError)
-            *outRegistrationError = "Editor UI context is unavailable.";
-
-        return false;
-    }
-
-    return m_EditorUIContext->RegisterStylesheet(
-        source, outParseError, outRegistrationError);
-}
-
-bool SilverwareBackend::UnregisterTheme(const Silverware::FThemeID& themeID, std::string* outError)
+bool SilverwareBackend::UnloadTheme(const Silverware::FThemeID& themeID, std::string* outError)
 {
     if (!m_EditorUIContext)
     {
@@ -295,10 +316,12 @@ bool SilverwareBackend::UnregisterTheme(const Silverware::FThemeID& themeID, std
         return false;
     }
 
-    return m_EditorUIContext->UnregisterTheme(themeID, outError);
+    return m_EditorUIContext->UnloadTheme(themeID, outError);
 }
 
-bool SilverwareBackend::SetActiveTheme(Silverware::FThemeID themeID, std::string* outError)
+bool SilverwareBackend::SetActiveTheme(
+    const Silverware::FThemeID& themeID,
+    std::string* outError)
 {
     if (!m_EditorUIContext)
     {
@@ -308,7 +331,7 @@ bool SilverwareBackend::SetActiveTheme(Silverware::FThemeID themeID, std::string
         return false;
     }
 
-    return m_EditorUIContext->SetActiveTheme(TakeUniqueOwnership(themeID), outError);
+    return m_EditorUIContext->SetActiveTheme(themeID, outError);
 }
 
 void SilverwareBackend::ClearActiveTheme() noexcept
