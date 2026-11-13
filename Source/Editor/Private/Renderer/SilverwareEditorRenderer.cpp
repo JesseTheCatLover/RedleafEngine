@@ -1,4 +1,3 @@
-
 // Copyright 2026 JesseTheCatLover. All Rights Reserved.
 
 #include "SilverwareEditorRenderer.h"
@@ -10,6 +9,9 @@
 #include "Silverware/Core/Widgets/CoreWidget.h"
 #include "Silverware/Core/Widgets/WidgetLayout.h"
 #include "Silverware/Core/Widgets/Styling/TextStyle.h"
+#include "Silverware/Core/Widgets/Styling/WidgetEffectStyle.h"
+#include "Silverware/Core/Widgets/Styling/WidgetVisualStyle.h"
+#include "Silverware/Core/Widgets/Styling/BackgroundStyle.h"
 #include "Silverware/UI/TextWidget.h"
 
 #include <iostream>
@@ -196,6 +198,28 @@ namespace
         return theme;
     }
 
+    void SetPadding(Silverware::FWidgetLayout &layout, float top, float right, float bottom, float left)
+    {
+        layout.padding.top = Silverware::FLayoutLength::Units(top);
+        layout.padding.right = Silverware::FLayoutLength::Units(right);
+        layout.padding.bottom = Silverware::FLayoutLength::Units(bottom);
+        layout.padding.left = Silverware::FLayoutLength::Units(left);
+    }
+
+    Silverware::FContainerLayout MakeContainerLayout(
+        Silverware::ELayoutDirection direction,
+        float gap,
+        Silverware::EAlignment alignItems = Silverware::EAlignment::Stretch,
+        Silverware::EJustification justifyContent = Silverware::EJustification::Start)
+    {
+        Silverware::FContainerLayout layout;
+        layout.direction = direction;
+        layout.gap = Silverware::FLayoutLength::Units(gap);
+        layout.alignItems = alignItems;
+        layout.justifyContent = justifyContent;
+        return layout;
+    }
+
     Silverware::ContainerWidget* AddContainer(
         Silverware::ContainerWidget& parent,
         const char* variant,
@@ -261,6 +285,285 @@ namespace
             return nullptr;
 
         return rawWidget;
+    }
+
+    bool AddWidgetEffectSample(
+        Silverware::ContainerWidget& parent,
+        const char* label,
+        const char* description,
+        Silverware::FWidgetEffectStyle effectStyle,
+        Silverware::FColor backgroundColor)
+    {
+        using namespace Silverware;
+
+        if (!AddText(parent, label, "Kicker"))
+            return false;
+
+        FWidgetLayout cardLayout;
+        cardLayout.width = FLayoutLength::Percent(100.0f);
+        cardLayout.height = FLayoutLength::Units(54.0f);
+        SetPadding(cardLayout, 7.0f, 9.0f, 7.0f, 9.0f);
+
+        ContainerWidget* card = AddContainer(
+            parent,
+            nullptr,
+            cardLayout,
+            MakeContainerLayout(
+                ELayoutDirection::Vertical,
+                0.0f,
+                EAlignment::Start,
+                EJustification::Center));
+
+        if (!card)
+            return false;
+
+        FWidgetVisualStyle visualStyle;
+        visualStyle.backgroundColor = backgroundColor;
+        visualStyle.borderColor = FColor{0.27f, 0.34f, 0.45f, 0.9f};
+        visualStyle.borderWidth = 1.0f;
+        visualStyle.cornerRadius = 7.0f;
+
+        card->SetVisualStyle(std::move(visualStyle));
+        card->SetEffectStyle(std::move(effectStyle));
+
+        return AddText(*card, description, "Body") != nullptr;
+    }
+
+    bool AddWidgetEffectSamples(Silverware::ContainerWidget& parent)
+    {
+        using namespace Silverware;
+
+        if (!AddText(parent, "WIDGET EFFECTS", "PanelTitle") ||
+            !AddText(parent, "Box effects, element filters and backdrop filters.", "Body"))
+            return false;
+
+        FWidgetEffectStyle outlineShadowStyle;
+        outlineShadowStyle.boxOutline = FBoxOutline{
+            FColor{0.28f, 0.76f, 1.0f, 1.0f},
+            1.5f,
+            2.0f,
+            EBorderStyle::Dashed
+        };
+        outlineShadowStyle.boxShadows = FBoxShadowList{
+            FBoxShadow{
+                FColor{0.05f, 0.48f, 0.82f, 0.42f},
+                0.0f,
+                3.0f,
+                10.0f,
+                0.0f,
+                false
+            }
+        };
+
+        if (!AddWidgetEffectSample(
+            parent,
+            "BOX OUTLINE + BOX SHADOW",
+            "Dashed outline with a soft outer shadow.",
+            std::move(outlineShadowStyle),
+            FColor{0.075f, 0.105f, 0.15f, 1.0f}))
+            return false;
+
+        FWidgetEffectStyle filterStyle;
+        filterStyle.filters = FWidgetFilterList{
+            FGaussianBlurFilter{1.6f}
+        };
+
+        if (!AddWidgetEffectSample(
+            parent,
+            "WIDGET FILTER: GAUSSIAN BLUR",
+            "The complete widget, including its text, is blurred.",
+            std::move(filterStyle),
+            FColor{0.12f, 0.20f, 0.29f, 1.0f}))
+            return false;
+
+        if (!AddText(parent, "BACKDROP FILTER: TEXT WIDGET", "Kicker"))
+            return false;
+
+        FWidgetLayout backdropCanvasLayout;
+        backdropCanvasLayout.width = FLayoutLength::Percent(100.0f);
+        backdropCanvasLayout.height = FLayoutLength::Units(68.0f);
+        SetPadding(backdropCanvasLayout, 7.0f, 8.0f, 7.0f, 8.0f);
+
+        ContainerWidget* backdropCanvas = AddContainer(
+            parent,
+            nullptr,
+            backdropCanvasLayout,
+            MakeContainerLayout(
+                ELayoutDirection::Vertical,
+                0.0f,
+                EAlignment::Stretch,
+                EJustification::Center));
+
+        if (!backdropCanvas)
+            return false;
+
+        FLinearGradient backdropGradient;
+        backdropGradient.angleDegrees = 0.0f;
+        backdropGradient.stops = {
+            {FColor{0.10f, 0.38f, 0.56f, 1.0f}, 0.0f},
+            {FColor{0.27f, 0.20f, 0.52f, 1.0f}, 0.5f},
+            {FColor{0.58f, 0.22f, 0.38f, 1.0f}, 1.0f}
+        };
+
+        FWidgetVisualStyle backdropCanvasVisual;
+        backdropCanvasVisual.backgroundLayers = FBackgroundLayerList{
+            FGradient{backdropGradient}
+        };
+        backdropCanvasVisual.cornerRadius = 8.0f;
+        backdropCanvas->SetVisualStyle(std::move(backdropCanvasVisual));
+
+        FTextStyle glassTextStyle;
+        glassTextStyle.fontSize = 14.0f;
+        glassTextStyle.fontWeight = EFontWeight::Bold;
+        glassTextStyle.color = FColor{0.96f, 0.98f, 1.0f, 1.0f};
+
+        TextWidget* glassText = AddStyledText(
+            *backdropCanvas,
+            "GLASS TEXT  /  BACKDROP BLUR",
+            std::move(glassTextStyle));
+
+        if (!glassText)
+            return false;
+
+        FWidgetVisualStyle glassVisualStyle;
+        glassVisualStyle.backgroundColor = FColor{0.045f, 0.075f, 0.13f, 0.48f};
+        glassVisualStyle.borderColor = FColor{0.82f, 0.91f, 1.0f, 0.58f};
+        glassVisualStyle.borderWidth = 1.0f;
+        glassVisualStyle.cornerRadius = 6.0f;
+        glassText->SetVisualStyle(std::move(glassVisualStyle));
+
+        FWidgetLayout glassTextLayout = glassText->GetLayout();
+        SetPadding(glassTextLayout, 12.0f, 9.0f, 12.0f, 9.0f);
+        glassText->SetLayout(std::move(glassTextLayout));
+
+        FWidgetEffectStyle backdropEffectStyle;
+        backdropEffectStyle.backdropFilters = FWidgetFilterList{
+            FGaussianBlurFilter{0.5f}
+        };
+        glassText->SetEffectStyle(std::move(backdropEffectStyle));
+
+        return true;
+    }
+
+    bool AddFontEffectSample(
+        Silverware::ContainerWidget& parent,
+        const char* label,
+        const char* sampleText,
+        Silverware::FFontEffectList effects,
+        std::vector<FTypographySample>& outSamples)
+    {
+        using namespace Silverware;
+
+        if (!AddText(parent, label, "Kicker"))
+            return false;
+
+        FTextStyle style;
+        style.fontSize = 16.0f;
+        style.fontWeight = EFontWeight::Bold;
+        style.color = FColor{0.91f, 0.95f, 1.0f, 1.0f};
+        style.fontEffects = std::move(effects);
+
+        FTextStyle baseStyle = style;
+        TextWidget* widget = AddStyledText(parent, sampleText, std::move(style));
+
+        if (!widget)
+            return false;
+
+        outSamples.push_back({widget, std::move(baseStyle)});
+        return true;
+    }
+
+    bool AddFontEffectSamples(
+        Silverware::ContainerWidget& parent,
+        std::vector<FTypographySample>& outSamples)
+    {
+        using namespace Silverware;
+
+        if (!AddText(parent, "FONT EFFECTS", "PanelTitle") ||
+            !AddText(parent, "Glyph-specific blur, glow, outline and shadow.", "Body"))
+            return false;
+
+        if (!AddFontEffectSample(
+            parent,
+            "FONT BLUR",
+            "Soft blurred glyphs",
+            FFontEffectList{
+                FFontBlurEffect{
+                    1.6f,
+                    FColor{0.28f, 0.72f, 1.0f, 0.95f}
+                }
+            },
+            outSamples))
+            return false;
+
+
+        if (!AddFontEffectSample(
+            parent,
+            "FONT GLOW",
+            "Cyan glow around the text",
+            FFontEffectList{
+                FFontGlowEffect{
+                    1.2f,
+                    4.0f,
+                    0.0f,
+                    0.0f,
+                    FColor{0.12f, 0.62f, 1.0f, 1.0f}
+                }
+            },
+            outSamples))
+            return false;
+
+        if (!AddFontEffectSample(
+            parent,
+            "FONT OUTLINE",
+            "Outlined typography",
+            FFontEffectList{
+                FFontOutlineEffect{
+                    1.4f,
+                    FColor{0.68f, 0.40f, 1.0f, 1.0f}
+                }
+            },
+            outSamples))
+            return false;
+
+        if (!AddFontEffectSample(
+            parent,
+            "FONT SHADOW",
+            "Offset hard glyph shadow",
+            FFontEffectList{
+                FFontHardShadowEffect{
+                    2.0f,
+                    3.0f,
+                    FColor{0.0f, 0.0f, 0.0f, 0.90f}
+                }
+            },
+            outSamples))
+            return false;
+
+        return AddFontEffectSample(
+            parent,
+            "COMBINED FONT EFFECTS",
+            "Shadow + outline + glow",
+            FFontEffectList{
+                FFontHardShadowEffect{
+                    1.5f,
+                    2.0f,
+                    FColor{0.0f, 0.0f, 0.0f, 0.85f}
+                },
+                FFontOutlineEffect{
+                    0.2f,
+                    FColor{0.18f, 0.58f, 0.95f, 1.0f}
+                },
+                FFontGlowEffect{
+                    0.5f,
+                    2.0f,
+                    0.0f,
+                    0.0f,
+                    FColor{0.12f, 0.48f, 0.95f, 0.72f}
+                }
+            },
+            outSamples);
+        return true;
     }
 
     bool AddTypographySamples(
@@ -417,28 +720,6 @@ namespace
             return false;
 
         return true;
-    }
-
-    void SetPadding(Silverware::FWidgetLayout &layout, float top, float right, float bottom, float left)
-    {
-        layout.padding.top = Silverware::FLayoutLength::Units(top);
-        layout.padding.right = Silverware::FLayoutLength::Units(right);
-        layout.padding.bottom = Silverware::FLayoutLength::Units(bottom);
-        layout.padding.left = Silverware::FLayoutLength::Units(left);
-    }
-
-    Silverware::FContainerLayout MakeContainerLayout(
-        Silverware::ELayoutDirection direction,
-        float gap,
-        Silverware::EAlignment alignItems = Silverware::EAlignment::Stretch,
-        Silverware::EJustification justifyContent = Silverware::EJustification::Start)
-    {
-        Silverware::FContainerLayout layout;
-        layout.direction = direction;
-        layout.gap = Silverware::FLayoutLength::Units(gap);
-        layout.alignItems = alignItems;
-        layout.justifyContent = justifyContent;
-        return layout;
     }
 
      bool AddOverflowTextCase(
@@ -852,8 +1133,7 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         panelLayout,
         MakeContainerLayout(ELayoutDirection::Vertical, 10.0f));
 
-    // Use the second column for typography tests for now. The interactive-block
-    // playground can return once its dedicated test cases are ready.
+    // Use the second column for widget and font effect samples for now.
     ContainerWidget* typographyPanel = AddContainer(
         *body,
         "Panel",
@@ -864,9 +1144,9 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         return false;
 
     if (!AddText(*buttonPanel, "BUTTONS", "PanelTitle") ||
-    !AddText(*buttonPanel, "Button interaction, focus and visual states.", "Body") ||
-    !AddText(*typographyPanel, "BOX OUTLINE", "PanelTitle") ||
-    !AddText(*typographyPanel, "Rounded strokes, line styles and offsets.", "Body"))
+        !AddText(*buttonPanel, "Button interaction, focus and visual states.", "Body") ||
+        !AddText(*typographyPanel, "WIDGET + FONT EFFECTS", "PanelTitle") ||
+        !AddText(*typographyPanel, "Rendering and typography effect samples.", "Body"))
         return false;
 
     FWidgetLayout areaLayout;
@@ -888,101 +1168,9 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
 
     std::vector<FTypographySample> typographySamples;
 
-    if (!m_ButtonPlayground || !typographyArea)
-        return false;
-
-        AddText(*typographyArea, "LINE STYLES", "PanelTitle");
-    AddText(*typographyArea, "Same geometry, different stroke patterns.", "Body");
-
-    const auto addOutlineSample = [](
-        ContainerWidget& parent,
-        const char* label,
-        const char* details,
-        EBorderStyle lineStyle,
-        float width,
-        float offset) -> bool
-    {
-        FWidgetLayout sampleLayout;
-        sampleLayout.width = FLayoutLength::Units(0.0f);
-        sampleLayout.height = FLayoutLength::Percent(100.0f);
-        sampleLayout.flexGrow = 1.0f;
-        SetPadding(sampleLayout, 10.0f, 10.0f, 10.0f, 10.0f);
-
-        ContainerWidget* sample = AddContainer(
-            parent,
-            nullptr,
-            sampleLayout,
-            MakeContainerLayout(
-                ELayoutDirection::Vertical,
-                4.0f,
-                EAlignment::Center,
-                EJustification::Center));
-
-        if (!sample)
-            return false;
-
-        FWidgetVisualStyle visualStyle;
-        visualStyle.backgroundColor = FColor{0.08f, 0.10f, 0.14f, 1.0f};
-        visualStyle.borderColor = FColor{0.32f, 0.39f, 0.49f, 1.0f};
-        visualStyle.borderWidth = 1.0f;
-        visualStyle.borderStyle = EBorderStyle::Solid;
-        visualStyle.cornerRadius = 10.0f;
-
-        sample->SetVisualStyle(visualStyle);
-
-        FBoxOutline outline;
-        outline.color = FColor{0.25f, 0.78f, 0.95f, 1.0f};
-        outline.width = width;
-        outline.style = lineStyle;
-        outline.offset = offset;
-
-        FWidgetEffectStyle effectStyle;
-        effectStyle.boxOutline = outline;
-
-        sample->SetEffectStyle(effectStyle);
-
-        return AddText(*sample, label, "PanelTitle") &&
-               AddText(*sample, details, "Mono");
-    };
-
-    // Primary comparison: identical dimensions and outline parameters.
-    FWidgetLayout lineStyleRowLayout;
-    lineStyleRowLayout.width = FLayoutLength::Percent(100.0f);
-    lineStyleRowLayout.height = FLayoutLength::Units(82.0f);
-
-    ContainerWidget* lineStyleRow = AddContainer(
-        *typographyArea,
-        nullptr,
-        lineStyleRowLayout,
-        MakeContainerLayout(
-            ELayoutDirection::Horizontal,
-            30.0f,
-            EAlignment::Center));
-
-    if (!lineStyleRow ||
-        !addOutlineSample(*lineStyleRow, "SOLID", "3dp / +4dp",
-            EBorderStyle::Solid, 3.0f, 4.0f) ||
-        !addOutlineSample(*lineStyleRow, "DASHED", "3dp / +4dp",
-            EBorderStyle::Dashed, 3.0f, 4.0f) ||
-        !addOutlineSample(*lineStyleRow, "DOTTED", "3dp / +4dp",
-            EBorderStyle::Dotted, 3.0f, 4.0f))
-        return false;
-
-    // Secondary comparison: thickness and offset variations.
-    ContainerWidget* outlineVariationRow = AddContainer(
-        *typographyArea,
-        nullptr,
-        lineStyleRowLayout,
-        MakeContainerLayout(
-            ELayoutDirection::Horizontal,
-            12.0f,
-            EAlignment::Center));
-
-    if (!outlineVariationRow ||
-        !addOutlineSample(*outlineVariationRow, "THICK SOLID", "6dp / +2dp",
-            EBorderStyle::Solid, 6.0f, 2.0f) ||
-        !addOutlineSample(*outlineVariationRow, "INSET DOTTED", "3dp / -3dp",
-            EBorderStyle::Dotted, 3.0f, -3.0f))
+    if (!m_ButtonPlayground || !typographyArea ||
+        !AddWidgetEffectSamples(*typographyArea) ||
+        !AddFontEffectSamples(*typographyArea, typographySamples))
         return false;
 
     // Rich content button
@@ -1130,7 +1318,7 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
 
     fontButtonVisualStyle.borderColor = FColor{0.48f, 0.59f, 0.72f, 0.65f};
     fontButtonVisualStyle.borderWidth = 2.0f;
-    fontButtonVisualStyle.borderStyle = EBorderStyle::Solid;
+    fontButtonVisualStyle.borderStyle = EBorderStyle::Dashed;
     fontButtonVisualStyle.cornerRadius = 7.0f;
     fontButtonVisualStyle.bottomRightRadius = 30.f;
     fontButtonVisualStyle.topLeftRadius = 20.f;
