@@ -1087,7 +1087,7 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         toolbarLayout,
         MakeContainerLayout(
             ELayoutDirection::Horizontal, 12.0f,
-            EAlignment::Center, EJustification::SpaceBetween));
+            EAlignment::Center, EJustification::Start));
 
     if (!toolbar ||
         !AddText(*toolbar, "SILVERWARE", "Accent") ||
@@ -1097,15 +1097,6 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     FWidgetLayout statusLayout;
     statusLayout.height = FLayoutLength::Units(30.0f);
     SetPadding(statusLayout, 0.0f, 10.0f, 0.0f, 10.0f);
-
-    ContainerWidget* statusPill = AddContainer(
-        *toolbar,
-        "StatusPill",
-        statusLayout,
-        MakeContainerLayout(ELayoutDirection::Horizontal, 0.0f, EAlignment::Center));
-
-    if (!statusPill || !AddText(*statusPill, "INPUT ROUTER", "Kicker"))
-        return false;
 
     // Main content
     FWidgetLayout bodyLayout;
