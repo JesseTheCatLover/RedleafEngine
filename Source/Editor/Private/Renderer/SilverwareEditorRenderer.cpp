@@ -1377,6 +1377,7 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
             case 1:
                 button->SetTransformStyle(transformStyleFontButton2);
                 button->SetVisualStyle(fontButtonVisualStyle);
+                button->SetEnabled(false);
                 break;
 
             case 2:
