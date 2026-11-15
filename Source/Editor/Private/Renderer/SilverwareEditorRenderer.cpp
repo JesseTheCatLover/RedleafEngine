@@ -7,7 +7,7 @@
 #include "Silverware/Core/Styling/StyleModel.h"
 #include "Silverware/Core/Widgets/ContainerWidget.h"
 #include "Silverware/Core/Widgets/CoreWidget.h"
-#include "Silverware/Core/Widgets/WidgetLayout.h"
+#include "Silverware/Core/Widgets/Styling/WidgetLayout.h"
 #include "Silverware/Core/Widgets/Styling/TextStyle.h"
 #include "Silverware/Core/Widgets/Styling/WidgetEffectStyle.h"
 #include "Silverware/Core/Widgets/Styling/WidgetVisualStyle.h"
@@ -1372,6 +1372,7 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
             case 0:
                 button->SetTransformStyle(transformStyleFontButton1);
                 button->SetVisualStyle(inkBlueButtonStyle);
+                button->SetEnterKeyActivationEnabled(true);
                 break;
 
             case 1:
@@ -1383,6 +1384,7 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
             case 2:
                 button->SetTransformStyle(transformStyleFontButton3);
                 button->SetVisualStyle(inkBlueButtonStyle);
+                button->SetSpaceKeyActivationEnabled(true);
                 break;
         }
 
