@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "Silverware/UI/ButtonWidget.h"
+#include "Silverware/UI/CheckboxWidget.h"
 #include "Silverware/UI/ImageWidget.h"
 
 namespace
@@ -30,8 +31,6 @@ namespace
     constexpr char kDarkThemeID[] = "Redleaf.InkBlue.Dark";
     constexpr char kLightThemeID[] = "Redleaf.InkBlue.Light";
 
-    constexpr char kPlaygroundThemeID[] = "Redleaf.SilverwarePlayground";
-
     struct FTypographySample
     {
         Silverware::TextWidget* widget = nullptr;
@@ -41,161 +40,6 @@ namespace
     FStyleValue Token(const char* tokenID)
     {
         return FStyleTokenReference{std::string(tokenID)};
-    }
-
-    void AddToken(FThemeDefinition& theme, const char* tokenID, FStyleValue value)
-    {
-        const std::string id(tokenID);
-        const std::size_t firstDot = id.find('.');
-        const std::size_t lastDot = id.find_last_of('.');
-
-        const std::string category = firstDot == std::string::npos
-            ? std::string{}
-            : id.substr(0, firstDot);
-
-        const std::string displayName = lastDot == std::string::npos
-            ? id
-            : id.substr(lastDot + 1);
-
-        theme.tokens.push_back({id, displayName, category, std::move(value)});
-    }
-
-    void AddVariant(FThemeDefinition& theme, const char* widgetType, const char* variantID, const char* displayName)
-    {
-        theme.variants.push_back({widgetType, variantID, displayName});
-    }
-
-    void AddRule(
-        FThemeDefinition& theme,
-        const char* widgetType,
-        const char* variantID,
-        FWidgetStateMask requiredStates,
-        FStylePropertyMap properties)
-    {
-        FStyleRule rule;
-        rule.selector.widgetType = widgetType;
-
-        if (variantID && *variantID)
-            rule.selector.variant = variantID;
-
-        rule.selector.requiredStates = requiredStates;
-        rule.properties = std::move(properties);
-
-        theme.rules.push_back(std::move(rule));
-    }
-
-    FThemeDefinition MakePlaygroundTheme()
-    {
-        FThemeDefinition theme;
-        theme.ID = kPlaygroundThemeID;
-
-        AddToken(theme, "color.canvas", FColor{0.035f, 0.043f, 0.063f, 1.0f});
-        AddToken(theme, "color.surface", FColor{0.065f, 0.078f, 0.106f, 1.0f});
-        AddToken(theme, "color.surfaceRaised", FColor{0.090f, 0.108f, 0.145f, 1.0f});
-        AddToken(theme, "color.border", FColor{0.18f, 0.22f, 0.29f, 1.0f});
-        AddToken(theme, "color.text", FColor{0.91f, 0.93f, 0.97f, 1.0f});
-        AddToken(theme, "color.muted", FColor{0.57f, 0.62f, 0.70f, 1.0f});
-        AddToken(theme, "color.accent", FColor{0.25f, 0.80f, 1.0f, 1.0f});
-        AddToken(theme, "color.accentSoft", FColor{0.08f, 0.34f, 0.46f, 0.42f});
-        AddToken(theme, "color.success", FColor{0.30f, 0.88f, 0.62f, 1.0f});
-
-        AddToken(theme, "font.family.body", std::string("LatoLatin"));
-        AddToken(theme, "font.family.mono", std::string("Roboto Mono"));
-
-        AddVariant(theme, "Container", "Root", "Playground root");
-        AddVariant(theme, "Container", "Toolbar", "Toolbar");
-        AddVariant(theme, "Container", "Panel", "Playground panel");
-        AddVariant(theme, "Container", "PlaygroundArea", "Widget test area");
-        AddVariant(theme, "Container", "StatusPill", "Status badge");
-
-        AddVariant(theme, "Text", "Header", "Header");
-        AddVariant(theme, "Text", "PanelTitle", "Panel title");
-        AddVariant(theme, "Text", "Body", "Body text");
-        AddVariant(theme, "Text", "Kicker", "Metadata");
-        AddVariant(theme, "Text", "Accent", "Accent text");
-        AddVariant(theme, "Text", "Mono", "Monospaced metadata");
-        AddVariant(theme, "Text", "Success", "Success text");
-
-        AddRule(theme, "Container", "Root", 0, {
-            {"background-color", Token("color.canvas")}
-        });
-
-        AddRule(theme, "Container", "Toolbar", 0, {
-            {"background-color", Token("color.surfaceRaised")},
-            {"border-color", Token("color.border")},
-            {"border-width", 1.0f},
-            {"border-style", EBorderStyle::Solid},
-            {"border-radius", 9.0f}
-        });
-
-        AddRule(theme, "Container", "Panel", 0, {
-            {"background-color", Token("color.surface")},
-            {"border-color", Token("color.border")},
-            {"border-width", 1.0f},
-            {"border-style", EBorderStyle::Solid},
-            {"border-radius", 10.0f}
-        });
-
-        AddRule(theme, "Container", "PlaygroundArea", 0, {
-            {"background-color", Token("color.surfaceRaised")},
-            {"border-color", Token("color.border")},
-            {"border-width", 1.0f},
-            {"border-style", EBorderStyle::Solid},
-            {"border-radius", 8.0f}
-        });
-
-        AddRule(theme, "Container", "StatusPill", 0, {
-            {"background-color", Token("color.accentSoft")},
-            {"border-color", Token("color.accent")},
-            {"border-width", 1.0f},
-            {"border-style", EBorderStyle::Solid},
-            {"border-radius", 99.0f}
-        });
-
-        AddRule(theme, "Text", nullptr, 0, {
-            {"color", Token("color.text")},
-            {"font-family", Token("font.family.body")}
-        });
-
-        AddRule(theme, "Text", "Header", 0, {
-            {"font-size", 18.0f},
-            {"font-weight", EFontWeight::Bold}
-        });
-
-        AddRule(theme, "Text", "PanelTitle", 0, {
-            {"font-size", 14.0f},
-            {"font-weight", EFontWeight::Bold}
-        });
-
-        AddRule(theme, "Text", "Body", 0, {
-            {"color", Token("color.muted")},
-            {"font-size", 12.0f}
-        });
-
-        AddRule(theme, "Text", "Kicker", 0, {
-            {"color", Token("color.accent")},
-            {"font-family", Token("font.family.mono")},
-            {"font-size", 10.0f},
-            {"font-weight", EFontWeight::Bold}
-        });
-
-        AddRule(theme, "Text", "Accent", 0, {
-            {"color", Token("color.accent")},
-            {"font-weight", EFontWeight::Bold}
-        });
-
-        AddRule(theme, "Text", "Mono", 0, {
-            {"color", Token("color.muted")},
-            {"font-family", Token("font.family.mono")},
-            {"font-size", 10.0f}
-        });
-
-        AddRule(theme, "Text", "Success", 0, {
-            {"color", Token("color.success")},
-            {"font-weight", EFontWeight::Bold}
-        });
-
-        return theme;
     }
 
     void SetPadding(Silverware::FWidgetLayout &layout, float top, float right, float bottom, float left)
@@ -327,122 +171,6 @@ namespace
         card->SetEffectStyle(std::move(effectStyle));
 
         return AddText(*card, description, "Body") != nullptr;
-    }
-
-    bool AddWidgetEffectSamples(Silverware::ContainerWidget& parent)
-    {
-        using namespace Silverware;
-
-        if (!AddText(parent, "WIDGET EFFECTS", "PanelTitle") ||
-            !AddText(parent, "Box effects, element filters and backdrop filters.", "Body"))
-            return false;
-
-        FWidgetEffectStyle outlineShadowStyle;
-        outlineShadowStyle.boxOutline = FBoxOutline{
-            FColor{0.28f, 0.76f, 1.0f, 1.0f},
-            1.5f,
-            2.0f,
-            EBorderStyle::Dashed
-        };
-        outlineShadowStyle.boxShadows = FBoxShadowList{
-            FBoxShadow{
-                FColor{0.05f, 0.48f, 0.82f, 0.42f},
-                0.0f,
-                3.0f,
-                10.0f,
-                0.0f,
-                false
-            }
-        };
-
-        if (!AddWidgetEffectSample(
-            parent,
-            "BOX OUTLINE + BOX SHADOW",
-            "Dashed outline with a soft outer shadow.",
-            std::move(outlineShadowStyle),
-            FColor{0.075f, 0.105f, 0.15f, 1.0f}))
-            return false;
-
-        FWidgetEffectStyle filterStyle;
-        filterStyle.filters = FWidgetFilterList{
-            FGaussianBlurFilter{1.6f}
-        };
-
-        if (!AddWidgetEffectSample(
-            parent,
-            "WIDGET FILTER: GAUSSIAN BLUR",
-            "The complete widget, including its text, is blurred.",
-            std::move(filterStyle),
-            FColor{0.12f, 0.20f, 0.29f, 1.0f}))
-            return false;
-
-        if (!AddText(parent, "BACKDROP FILTER: TEXT WIDGET", "Kicker"))
-            return false;
-
-        FWidgetLayout backdropCanvasLayout;
-        backdropCanvasLayout.width = FLayoutLength::Percent(100.0f);
-        backdropCanvasLayout.height = FLayoutLength::Units(68.0f);
-        SetPadding(backdropCanvasLayout, 7.0f, 8.0f, 7.0f, 8.0f);
-
-        ContainerWidget* backdropCanvas = AddContainer(
-            parent,
-            nullptr,
-            backdropCanvasLayout,
-            MakeContainerLayout(
-                ELayoutDirection::Vertical,
-                0.0f,
-                EAlignment::Stretch,
-                EJustification::Center));
-
-        if (!backdropCanvas)
-            return false;
-
-        FLinearGradient backdropGradient;
-        backdropGradient.angleDegrees = 0.0f;
-        backdropGradient.stops = {
-            {FColor{0.10f, 0.38f, 0.56f, 1.0f}, 0.0f},
-            {FColor{0.27f, 0.20f, 0.52f, 1.0f}, 0.5f},
-            {FColor{0.58f, 0.22f, 0.38f, 1.0f}, 1.0f}
-        };
-
-        FWidgetVisualStyle backdropCanvasVisual;
-        backdropCanvasVisual.backgroundLayers = FBackgroundLayerList{
-            FGradient{backdropGradient}
-        };
-        backdropCanvasVisual.cornerRadius = 8.0f;
-        backdropCanvas->SetVisualStyle(std::move(backdropCanvasVisual));
-
-        FTextStyle glassTextStyle;
-        glassTextStyle.fontSize = 14.0f;
-        glassTextStyle.fontWeight = EFontWeight::Bold;
-        glassTextStyle.color = FColor{0.96f, 0.98f, 1.0f, 1.0f};
-
-        TextWidget* glassText = AddStyledText(
-            *backdropCanvas,
-            "GLASS TEXT  /  BACKDROP BLUR",
-            std::move(glassTextStyle));
-
-        if (!glassText)
-            return false;
-
-        FWidgetVisualStyle glassVisualStyle;
-        glassVisualStyle.backgroundColor = FColor{0.045f, 0.075f, 0.13f, 0.48f};
-        glassVisualStyle.borderColor = FColor{0.82f, 0.91f, 1.0f, 0.58f};
-        glassVisualStyle.borderWidth = 1.0f;
-        glassVisualStyle.cornerRadius = 6.0f;
-        glassText->SetVisualStyle(std::move(glassVisualStyle));
-
-        FWidgetLayout glassTextLayout = glassText->GetLayout();
-        SetPadding(glassTextLayout, 12.0f, 9.0f, 12.0f, 9.0f);
-        glassText->SetLayout(std::move(glassTextLayout));
-
-        FWidgetEffectStyle backdropEffectStyle;
-        backdropEffectStyle.backdropFilters = FWidgetFilterList{
-            FGaussianBlurFilter{0.5f}
-        };
-        glassText->SetEffectStyle(std::move(backdropEffectStyle));
-
-        return true;
     }
 
     bool AddFontEffectSample(
@@ -996,6 +724,79 @@ namespace
         return rawWidget;
     }
 
+    CheckboxWidget* AddCheckbox(
+    ContainerWidget& parent,
+    const char* label,
+    const char* variant,
+    FWidgetLayout rowLayout,
+    FContainerLayout contentLayout)
+    {
+        using namespace Silverware;
+
+        auto row = Silverware::MakeUnique<ContainerWidget>();
+        row->SetLayout(rowLayout);
+        row->SetContainerLayout(MakeContainerLayout(
+            ELayoutDirection::Horizontal,
+            6.0f,
+            EAlignment::Center,
+            EJustification::Start));
+
+        auto content = Silverware::MakeUnique<ContainerWidget>();
+
+        FWidgetLayout contentWidgetLayout;
+        contentWidgetLayout.width = FLayoutLength::Units(0.0f);
+        contentWidgetLayout.height = FLayoutLength::Auto();
+        contentWidgetLayout.flexGrow = 1.0f;
+
+        content->SetStyleVariant("CheckboxLabelContent");
+        content->SetLayout(contentWidgetLayout);
+        content->SetContainerLayout(contentLayout);
+
+        auto checkbox = Silverware::MakeUnique<CheckboxWidget>();
+
+        if (variant && *variant)
+            checkbox->SetStyleVariant(variant);
+
+        FWidgetLayout checkboxLayout;
+        checkboxLayout.width = FLayoutLength::Units(20.0f);
+        checkboxLayout.height = FLayoutLength::Units(20.0f);
+
+        checkbox->SetLayout(checkboxLayout);
+
+        CheckboxWidget* rawCheckbox = checkbox.get();
+        ContainerWidget* rawContent = content.get();
+
+        // Add the content before the checkbox to preserve left-to-right order.
+        if (!row->AddChild(Silverware::TUniquePtr<CoreWidget>(content.release())))
+            return nullptr;
+
+        if (!row->AddChild(Silverware::TUniquePtr<CoreWidget>(checkbox.release())))
+            return nullptr;
+
+        if (!rawCheckbox->SetContentWidget(rawContent))
+            return nullptr;
+
+        TextWidget* labelWidget = AddText(*rawContent, label, "CheckboxLabel");
+
+        if (!labelWidget)
+            return nullptr;
+
+        FWidgetTransformStyle labelTransform;
+        labelTransform.operations = FTransformOperationList{
+            FTranslateTransform{
+                FLayoutLength::Units(0.0f),
+                FLayoutLength::Units(4.0f)
+            }
+        };
+
+        labelWidget->SetTransformStyle(std::move(labelTransform));
+
+        if (!parent.AddChild(Silverware::TUniquePtr<CoreWidget>(row.release())))
+            return nullptr;
+
+        return rawCheckbox;
+    }
+
     Silverware::ImageWidget* AddImage(
     Silverware::ContainerWidget& parent,
     Silverware::FResourcePath source,
@@ -1160,7 +961,6 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     std::vector<FTypographySample> typographySamples;
 
     if (!m_ButtonPlayground || !typographyArea ||
-        !AddWidgetEffectSamples(*typographyArea) ||
         !AddFontEffectSamples(*typographyArea, typographySamples))
         return false;
 
@@ -1182,26 +982,6 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
 
     if (!richButton)
         return false;
-
-
-    FWidgetTransformStyle transformStyle;
-
-    transformStyle.operations = FTransformOperationList
-    {
-        FTranslateTransform{
-            FLayoutLength::Units(20.0f),
-            FLayoutLength::Units(0.0f)
-        },
-        FRotateTransform{15.0f},
-        FScaleTransform{1.2f, 1.2f}
-    };
-
-    transformStyle.origin = FTransformOrigin{
-        FLayoutLength::Percent(50.0f),
-        FLayoutLength::Percent(50.0f)
-    };
-
-    richButton->SetTransformStyle(std::move(transformStyle));
 
     // Icon
     FResourcePath iconSource;
@@ -1416,9 +1196,90 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     };
 
     if (!addFontButton(0, "FunnelSans", "Funnel Sans") ||
-        !addFontButton(1, "RobotoMono", "Roboto Mono") ||
-        !addFontButton(2, "LatoLatin", "LatoLatin"))
+        !addFontButton(1, "RobotoMono", "Roboto Mono")
+        // || !addFontButton(2, "LatoLatin", "LatoLatin")
+        )
         return false;
+
+    // Checkbox list
+    FWidgetLayout checkboxListLayout;
+    checkboxListLayout.width = FLayoutLength::Units(180.0f);
+    checkboxListLayout.height = FLayoutLength::Auto();
+
+    ContainerWidget *checkboxList = AddContainer(
+        *m_ButtonPlayground,
+        nullptr,
+        checkboxListLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Vertical,
+            8.0f,
+            EAlignment::Start,
+            EJustification::Start));
+
+    if (!checkboxList)
+        return false;
+
+    if (!AddText(*checkboxList, "CHECKBOXES", "PanelTitle") ||
+        !AddText(*checkboxList, "Pointer, keyboard, checked and disabled states.", "Body"))
+        return false;
+
+    // Checkbox rows
+    FWidgetLayout checkboxRowLayout;
+    checkboxRowLayout.width = FLayoutLength::Percent(100.0f);
+    checkboxRowLayout.height = FLayoutLength::Units(26.0f);
+
+    const FContainerLayout checkboxContentLayout = MakeContainerLayout(
+        ELayoutDirection::Horizontal,
+        0.0f,
+        EAlignment::Center,
+        EJustification::Start);
+
+    CheckboxWidget *vsyncCheckbox = AddCheckbox(
+        *checkboxList,
+        "Enable VSync",
+        nullptr,
+        checkboxRowLayout,
+        checkboxContentLayout);
+
+    if (!vsyncCheckbox)
+        return false;
+
+    m_CheckboxChangedConnections[0] = vsyncCheckbox->OnCheckedChanged().Connect(
+        [](TValueChangedEvent<bool> &event) {
+            std::cout << "[SilverwarePlayground]: VSync checkbox "
+                    << (event.newValue ? "checked" : "unchecked") << ".\n";
+        });
+
+    CheckboxWidget *hdrCheckbox = AddCheckbox(
+        *checkboxList,
+        "Enable HDR",
+        nullptr,
+        checkboxRowLayout,
+        checkboxContentLayout);
+
+    if (!hdrCheckbox)
+        return false;
+
+    hdrCheckbox->SetChecked(true);
+
+    m_CheckboxChangedConnections[1] = hdrCheckbox->OnCheckedChanged().Connect(
+        [](TValueChangedEvent<bool> &event) {
+            std::cout << "[SilverwarePlayground]: HDR checkbox "
+                    << (event.newValue ? "checked" : "unchecked") << ".\n";
+        });
+
+    CheckboxWidget *disabledCheckbox = AddCheckbox(
+        *checkboxList,
+        "Read-only setting",
+        nullptr,
+        checkboxRowLayout,
+        checkboxContentLayout);
+
+    if (!disabledCheckbox)
+        return false;
+
+    disabledCheckbox->SetChecked(true);
+    disabledCheckbox->SetEnabled(false);
 
     // Footer
     FWidgetLayout footerLayout;
@@ -1462,8 +1323,12 @@ void SilverwareEditorRenderer::Shutdown()
     for (auto& connection : m_FontButtonClickConnections)
         connection.Disconnect();
 
+    for (auto& connection : m_CheckboxChangedConnections)
+        connection.Disconnect();
+
     m_ButtonPlayground = nullptr;
     m_InteractiveBlockPlayground = nullptr;
     m_RootWidget.reset();
     m_Backend = nullptr;
 }
+

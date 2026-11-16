@@ -27,6 +27,7 @@ private:
 
     Silverware::FEventConnection m_PrimaryButtonClickConnection;
     decltype(m_PrimaryButtonClickConnection) m_FontButtonClickConnections[3];
+    decltype(m_PrimaryButtonClickConnection) m_CheckboxChangedConnections[2];
 
 public:
     SilverwareEditorRenderer();
