@@ -12,16 +12,17 @@
 #include "Silverware/Core/Widgets/Styling/WidgetEffectStyle.h"
 #include "Silverware/Core/Widgets/Styling/WidgetVisualStyle.h"
 #include "Silverware/Core/Widgets/Styling/BackgroundStyle.h"
-#include "Silverware/UI/TextWidget.h"
+#include "Silverware/UI/Widgets/TextWidget.h"
 
 #include <iostream>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "Silverware/UI/ButtonWidget.h"
-#include "Silverware/UI/CheckboxWidget.h"
-#include "Silverware/UI/ImageWidget.h"
+#include "Silverware/UI/Widgets/ButtonWidget.h"
+#include "Silverware/UI/Widgets/CheckboxWidget.h"
+#include "Silverware/UI/Widgets/ImageWidget.h"
+#include "Silverware/UI/Widgets/RadioButtonWidget.h"
 
 namespace
 {
@@ -797,6 +798,64 @@ namespace
         return rawCheckbox;
     }
 
+    RadioButtonWidget* AddRadioButton(
+        ContainerWidget& parent,
+        const char* label,
+        const char* groupName,
+        FWidgetLayout rowLayout,
+        FContainerLayout contentLayout)
+    {
+        using namespace Silverware;
+
+        auto row = Silverware::MakeUnique<ContainerWidget>();
+        row->SetLayout(rowLayout);
+        row->SetContainerLayout(MakeContainerLayout(
+            ELayoutDirection::Horizontal,
+            6.0f,
+            EAlignment::Center,
+            EJustification::Start));
+
+        auto radioButton = Silverware::MakeUnique<RadioButtonWidget>();
+
+        FWidgetLayout radioButtonLayout;
+        radioButtonLayout.width = FLayoutLength::Units(20.0f);
+        radioButtonLayout.height = FLayoutLength::Units(20.0f);
+        radioButton->SetLayout(radioButtonLayout);
+        radioButton->SetGroupName(groupName ? groupName : "");
+
+        auto content = Silverware::MakeUnique<ContainerWidget>();
+
+        FWidgetLayout contentWidgetLayout;
+        contentWidgetLayout.width = FLayoutLength::Units(0.0f);
+        contentWidgetLayout.height = FLayoutLength::Auto();
+        contentWidgetLayout.flexGrow = 1.0f;
+
+        content->SetStyleVariant("RadioButtonLabelContent");
+        content->SetLayout(contentWidgetLayout);
+        content->SetContainerLayout(contentLayout);
+
+        RadioButtonWidget* rawRadioButton = radioButton.get();
+        ContainerWidget* rawContent = content.get();
+
+        // Keep the indicator before its label in the horizontal row.
+        if (!row->AddChild(Silverware::TUniquePtr<CoreWidget>(radioButton.release())))
+            return nullptr;
+
+        if (!row->AddChild(Silverware::TUniquePtr<CoreWidget>(content.release())))
+            return nullptr;
+
+        if (!rawRadioButton->SetContentWidget(rawContent))
+            return nullptr;
+
+        if (!AddText(*rawContent, label, "RadioButtonLabel"))
+            return nullptr;
+
+        if (!parent.AddChild(Silverware::TUniquePtr<CoreWidget>(row.release())))
+            return nullptr;
+
+        return rawRadioButton;
+    }
+
     Silverware::ImageWidget* AddImage(
     Silverware::ContainerWidget& parent,
     Silverware::FResourcePath source,
@@ -1281,6 +1340,106 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     disabledCheckbox->SetChecked(true);
     disabledCheckbox->SetEnabled(false);
 
+    // Radio button group
+    FWidgetLayout radioButtonListLayout;
+    radioButtonListLayout.width = FLayoutLength::Units(220.0f);
+    radioButtonListLayout.height = FLayoutLength::Auto();
+
+    ContainerWidget* radioButtonList = AddContainer(
+        *m_ButtonPlayground,
+        nullptr,
+        radioButtonListLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Vertical,
+            8.0f,
+            EAlignment::Start,
+            EJustification::Start));
+
+    if (!radioButtonList ||
+        !AddText(*radioButtonList, "RADIO BUTTONS", "PanelTitle") ||
+        !AddText(*radioButtonList, "Mutually exclusive rendering backend selection.", "Body"))
+    {
+        return false;
+    }
+
+    FWidgetLayout radioButtonRowLayout;
+    radioButtonRowLayout.width = FLayoutLength::Percent(100.0f);
+    radioButtonRowLayout.height = FLayoutLength::Units(26.0f);
+
+    const FContainerLayout radioButtonContentLayout = MakeContainerLayout(
+        ELayoutDirection::Horizontal,
+        0.0f,
+        EAlignment::Center,
+        EJustification::Start);
+
+    constexpr char kRenderingBackendGroup[] = "RenderingBackend";
+
+    RadioButtonWidget* openGLRadioButton = AddRadioButton(
+        *radioButtonList,
+        "OpenGL",
+        kRenderingBackendGroup,
+        radioButtonRowLayout,
+        radioButtonContentLayout);
+
+    RadioButtonWidget* vulkanRadioButton = AddRadioButton(
+        *radioButtonList,
+        "Vulkan",
+        kRenderingBackendGroup,
+        radioButtonRowLayout,
+        radioButtonContentLayout);
+
+    RadioButtonWidget* metalRadioButton = AddRadioButton(
+        *radioButtonList,
+        "Metal",
+        kRenderingBackendGroup,
+        radioButtonRowLayout,
+        radioButtonContentLayout);
+
+    RadioButtonWidget* directXRadioButton = AddRadioButton(
+        *radioButtonList,
+        "DirectX 12 (unavailable)",
+        kRenderingBackendGroup,
+        radioButtonRowLayout,
+        radioButtonContentLayout);
+
+    if (!openGLRadioButton || !vulkanRadioButton ||
+        !metalRadioButton || !directXRadioButton)
+    {
+        return false;
+    }
+
+    // The initial selection is established before the tree is attached to the context.
+    vulkanRadioButton->SetSelected(true);
+    directXRadioButton->SetEnabled(false);
+
+    m_RadioButtonChangedConnections[0] = openGLRadioButton->OnSelectedChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: OpenGL radio button "
+                      << (event.newValue ? "selected" : "deselected") << ".\n";
+        });
+
+    m_RadioButtonChangedConnections[1] = vulkanRadioButton->OnSelectedChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: Vulkan radio button "
+                      << (event.newValue ? "selected" : "deselected") << ".\n";
+        });
+
+    m_RadioButtonChangedConnections[2] = metalRadioButton->OnSelectedChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: Metal radio button "
+                      << (event.newValue ? "selected" : "deselected") << ".\n";
+        });
+
+    m_RadioButtonChangedConnections[3] = directXRadioButton->OnSelectedChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: DirectX 12 radio button "
+                      << (event.newValue ? "selected" : "deselected") << ".\n";
+        });
+
     // Footer
     FWidgetLayout footerLayout;
     footerLayout.height = FLayoutLength::Units(28.0f);
@@ -1326,9 +1485,13 @@ void SilverwareEditorRenderer::Shutdown()
     for (auto& connection : m_CheckboxChangedConnections)
         connection.Disconnect();
 
+    for (auto& connection : m_RadioButtonChangedConnections)
+        connection.Disconnect();
+
     m_ButtonPlayground = nullptr;
     m_InteractiveBlockPlayground = nullptr;
     m_RootWidget.reset();
     m_Backend = nullptr;
 }
+
 

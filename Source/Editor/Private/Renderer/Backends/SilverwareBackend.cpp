@@ -18,6 +18,7 @@
 #include <string>
 #include <utility>
 
+#include "Silverware/UI/Management/UIWidgetManagerCollectionFactory.h"
 #include "Utilities/UFileSystem.h"
 
 namespace
@@ -206,6 +207,7 @@ bool SilverwareBackend::InitializeRuntime(IPlatformWindow& window)
     hostConfig.backendRuntime = MakeUnique<Silverware::Backends::RmlUi::RmlUiBackendRuntime>(TakeUniqueOwnership(backendConfig));
     hostConfig.resourceProvider = Silverware::TakeUniqueOwnership(m_ResourceProvider);
     hostConfig.fontRegistry = Silverware::TakeUniqueOwnership(m_FontRegistry);
+    hostConfig.widgetManagerFactory = Silverware::MakeUnique<Silverware::UIWidgetManagerCollectionFactory>();
 
     // Resolve Silverware's installation path; the runtime mounts its resources itself.
     hostConfig.silverwareRoot = std::filesystem::path(UFileSystem::GetEngineRoot() / "Frameworks" / "Silverware");
@@ -272,7 +274,7 @@ bool SilverwareBackend::InitializeRuntime(IPlatformWindow& window)
                   << error << '\n';
         return false;
     }
-    
+
     return true;
 }
 
