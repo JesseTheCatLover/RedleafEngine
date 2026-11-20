@@ -29,6 +29,7 @@ private:
     decltype(m_PrimaryButtonClickConnection) m_FontButtonClickConnections[3];
     decltype(m_PrimaryButtonClickConnection) m_CheckboxChangedConnections[2];
     decltype(m_PrimaryButtonClickConnection) m_RadioButtonChangedConnections[4];
+    decltype(m_PrimaryButtonClickConnection) m_ToggleChangedConnections[4];
 
 public:
     SilverwareEditorRenderer();

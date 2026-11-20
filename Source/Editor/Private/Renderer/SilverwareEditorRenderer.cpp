@@ -23,6 +23,7 @@
 #include "Silverware/UI/Widgets/CheckboxWidget.h"
 #include "Silverware/UI/Widgets/ImageWidget.h"
 #include "Silverware/UI/Widgets/RadioButtonWidget.h"
+#include "Silverware/UI/Widgets/ToggleWidget.h"
 
 namespace
 {
@@ -856,6 +857,69 @@ namespace
         return rawRadioButton;
     }
 
+    ToggleWidget* AddToggle(
+        ContainerWidget& parent,
+        const char* label,
+        const char* variant,
+        FWidgetLayout rowLayout)
+    {
+        using namespace Silverware;
+
+        auto row = Silverware::MakeUnique<ContainerWidget>();
+        row->SetLayout(rowLayout);
+        row->SetContainerLayout(MakeContainerLayout(
+            ELayoutDirection::Horizontal,
+            8.0f,
+            EAlignment::Center,
+            EJustification::Start));
+
+        auto content = Silverware::MakeUnique<ContainerWidget>();
+
+        FWidgetLayout contentWidgetLayout;
+        contentWidgetLayout.width = FLayoutLength::Units(0.0f);
+        contentWidgetLayout.height = FLayoutLength::Auto();
+        contentWidgetLayout.flexGrow = 1.0f;
+
+        content->SetStyleVariant("ToggleLabelContent");
+        content->SetLayout(contentWidgetLayout);
+        content->SetContainerLayout(MakeContainerLayout(
+            ELayoutDirection::Horizontal,
+            0.0f,
+            EAlignment::Center,
+            EJustification::Start));
+
+        auto toggle = Silverware::MakeUnique<ToggleWidget>();
+
+        if (variant && *variant)
+            toggle->SetStyleVariant(variant);
+
+        FWidgetLayout toggleLayout;
+        toggleLayout.width = FLayoutLength::Units(44.0f);
+        toggleLayout.height = FLayoutLength::Units(24.0f);
+        toggle->SetLayout(toggleLayout);
+
+        ToggleWidget* rawToggle = toggle.get();
+        ContainerWidget* rawContent = content.get();
+
+        // Keep the label content before the switch in the horizontal row.
+        if (!row->AddChild(Silverware::TUniquePtr<CoreWidget>(content.release())))
+            return nullptr;
+
+        if (!row->AddChild(Silverware::TUniquePtr<CoreWidget>(toggle.release())))
+            return nullptr;
+
+        if (!rawToggle->SetContentWidget(rawContent))
+            return nullptr;
+
+        if (!AddText(*rawContent, label, "ToggleLabel"))
+            return nullptr;
+
+        if (!parent.AddChild(Silverware::TUniquePtr<CoreWidget>(row.release())))
+            return nullptr;
+
+        return rawToggle;
+    }
+
     Silverware::ImageWidget* AddImage(
     Silverware::ContainerWidget& parent,
     Silverware::FResourcePath source,
@@ -1254,11 +1318,11 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         return true;
     };
 
-    if (!addFontButton(0, "FunnelSans", "Funnel Sans") ||
-        !addFontButton(1, "RobotoMono", "Roboto Mono")
-        // || !addFontButton(2, "LatoLatin", "LatoLatin")
-        )
-        return false;
+    // if (!addFontButton(0, "FunnelSans", "Funnel Sans") ||
+    //     !addFontButton(1, "RobotoMono", "Roboto Mono")
+    //     // || !addFontButton(2, "LatoLatin", "LatoLatin")
+    //     )
+    //     return false;
 
     // Checkbox list
     FWidgetLayout checkboxListLayout;
@@ -1440,6 +1504,96 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
                       << (event.newValue ? "selected" : "deselected") << ".\n";
         });
 
+    // Toggle examples
+    FWidgetLayout toggleListLayout;
+    toggleListLayout.width = FLayoutLength::Units(200.0f);
+    toggleListLayout.height = FLayoutLength::Auto();
+
+    ContainerWidget* toggleList = AddContainer(
+        *m_ButtonPlayground,
+        nullptr,
+        toggleListLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Vertical,
+            8.0f,
+            EAlignment::Start,
+            EJustification::Start));
+
+    if (!toggleList ||
+        !AddText(*toggleList, "TOGGLES", "PanelTitle") ||
+        !AddText(*toggleList, "Independent on/off controls with animated thumbs.", "Body"))
+    {
+        return false;
+    }
+
+    FWidgetLayout toggleRowLayout;
+    toggleRowLayout.width = FLayoutLength::Percent(100.0f);
+    toggleRowLayout.height = FLayoutLength::Units(28.0f);
+
+    ToggleWidget* temporalUpscalingToggle = AddToggle(
+        *toggleList,
+        "Temporal Upscaling",
+        "Default",
+        toggleRowLayout);
+
+    ToggleWidget* dynamicResolutionToggle = AddToggle(
+        *toggleList,
+        "Dynamic Resolution",
+        "Default",
+        toggleRowLayout);
+
+    ToggleWidget* rayTracingToggle = AddToggle(
+        *toggleList,
+        "Ray Tracing",
+        "Default",
+        toggleRowLayout);
+
+    ToggleWidget* disabledToggle = AddToggle(
+        *toggleList,
+        "Read-only feature",
+        "Default",
+        toggleRowLayout);
+
+    if (!temporalUpscalingToggle || !dynamicResolutionToggle ||
+        !rayTracingToggle || !disabledToggle)
+    {
+        return false;
+    }
+
+    // Establish initial values before the root tree is attached to the UI context.
+    temporalUpscalingToggle->SetOn(true);
+    rayTracingToggle->SetOn(true);
+    disabledToggle->SetOn(true);
+    disabledToggle->SetEnabled(false);
+
+    m_ToggleChangedConnections[0] = temporalUpscalingToggle->OnToggledChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: Temporal Upscaling "
+                      << (event.newValue ? "enabled" : "disabled") << ".\n";
+        });
+
+    m_ToggleChangedConnections[1] = dynamicResolutionToggle->OnToggledChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: Dynamic Resolution "
+                      << (event.newValue ? "enabled" : "disabled") << ".\n";
+        });
+
+    m_ToggleChangedConnections[2] = rayTracingToggle->OnToggledChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: Ray Tracing "
+                      << (event.newValue ? "enabled" : "disabled") << ".\n";
+        });
+
+    m_ToggleChangedConnections[3] = disabledToggle->OnToggledChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: Read-only feature "
+                      << (event.newValue ? "enabled" : "disabled") << ".\n";
+        });
+
     // Footer
     FWidgetLayout footerLayout;
     footerLayout.height = FLayoutLength::Units(28.0f);
@@ -1486,6 +1640,9 @@ void SilverwareEditorRenderer::Shutdown()
         connection.Disconnect();
 
     for (auto& connection : m_RadioButtonChangedConnections)
+        connection.Disconnect();
+
+    for (auto& connection : m_ToggleChangedConnections)
         connection.Disconnect();
 
     m_ButtonPlayground = nullptr;
