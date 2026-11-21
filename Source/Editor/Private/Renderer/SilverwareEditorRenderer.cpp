@@ -14,7 +14,9 @@
 #include "Silverware/Core/Widgets/Styling/BackgroundStyle.h"
 #include "Silverware/UI/Widgets/TextWidget.h"
 
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -24,6 +26,7 @@
 #include "Silverware/UI/Widgets/ImageWidget.h"
 #include "Silverware/UI/Widgets/RadioButtonWidget.h"
 #include "Silverware/UI/Widgets/ToggleWidget.h"
+#include "Silverware/UI/Widgets/SliderWidget.h"
 
 namespace
 {
@@ -920,6 +923,50 @@ namespace
         return rawToggle;
     }
 
+    std::string FormatSliderValue(double value, int precision, const char* suffix)
+    {
+        std::ostringstream stream;
+        stream << std::fixed << std::setprecision(precision) << value;
+
+        if (suffix && *suffix)
+            stream << suffix;
+
+        return stream.str();
+    }
+
+    SliderWidget* AddSlider(
+        ContainerWidget& parent,
+        const char* variant,
+        FWidgetLayout layout,
+        double minimum,
+        double maximum,
+        double step,
+        double value,
+        ESliderOrientation orientation = ESliderOrientation::Horizontal)
+    {
+        using namespace Silverware;
+
+        auto widget = Silverware::MakeUnique<SliderWidget>();
+
+        if (variant && *variant)
+            widget->SetStyleVariant(variant);
+
+        widget->SetLayout(layout);
+        widget->SetOrientation(orientation);
+
+        if (!widget->SetRange(minimum, maximum) || !widget->SetStep(step))
+            return nullptr;
+
+        widget->SetValue(value);
+
+        SliderWidget* rawWidget = widget.get();
+
+        if (!parent.AddChild(Silverware::TUniquePtr<CoreWidget>(widget.release())))
+            return nullptr;
+
+        return rawWidget;
+    }
+
     Silverware::ImageWidget* AddImage(
     Silverware::ContainerWidget& parent,
     Silverware::FResourcePath source,
@@ -1087,66 +1134,71 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         !AddFontEffectSamples(*typographyArea, typographySamples))
         return false;
 
+    // The interaction column now contains several control examples.
+    FWidgetOverflowStyle playgroundOverflow;
+    playgroundOverflow.overflowY = EOverflowMode::Auto;
+    m_ButtonPlayground->SetOverflowStyle(std::move(playgroundOverflow));
+
     // Rich content button
     FWidgetLayout buttonLayout;
     buttonLayout.width = FLayoutLength::Units(240.0f);
     buttonLayout.height = FLayoutLength::Units(58.0f);
     SetPadding(buttonLayout, 8.0f, 8.0f, 8.0f, 8.0f);
-
-    ButtonWidget* richButton = AddButton(
-        *m_ButtonPlayground,
-        "Primary",
-        buttonLayout,
-        MakeContainerLayout(
-            ELayoutDirection::Horizontal,
-            10.0f,
-            EAlignment::Center,
-            EJustification::Center));
-
-    if (!richButton)
-        return false;
-
-    // Icon
-    FResourcePath iconSource;
-
-    if (!FResourcePath::TryParse("silverware:/Textures/save02.png", iconSource))
-        return false;
-
-    FWidgetLayout iconLayout;
-    iconLayout.width = FLayoutLength::Units(24.0f);
-    iconLayout.height = FLayoutLength::Units(24.0f);
-
-    FImageStyle iconStyle;
-    iconStyle.fit = EImageFit::Contain;
-
-    if (!AddImage(*richButton, std::move(iconSource), iconLayout, iconStyle))
-        return false;
-
-    // Text content
-    ContainerWidget* textContent = AddContainer(
-        *richButton,
-        nullptr,
-        FWidgetLayout{},
-        MakeContainerLayout(
-            ELayoutDirection::Vertical,
-            2.0f,
-            EAlignment::Start,
-            EJustification::Center));
-
-    if (!textContent)
-        return false;
-
-    if (!AddText(*textContent, "Save Project", "PanelTitle") ||
-        !AddText(*textContent, "Write changes to disk", "Body"))
-        return false;
-
-    // Click event
-    m_PrimaryButtonClickConnection = richButton->OnClick().Connect(
-        [](FClickEvent& event)
-        {
-            event.MarkHandled();
-            std::cout << "[SilverwarePlayground]: Rich button clicked.\n";
-        });
+    //
+    // ButtonWidget* richButton = AddButton(
+    //     *m_ButtonPlayground,
+    //     "Primary",
+    //     buttonLayout,
+    //     MakeContainerLayout(
+    //         ELayoutDirection::Horizontal,
+    //         10.0f,
+    //         EAlignment::Center,
+    //         EJustification::Center));
+    //
+    // if (!richButton)
+    //     return false;
+    //
+    // // Icon
+    // FResourcePath iconSource;
+    //
+    // if (!FResourcePath::TryParse("silverware:/Textures/save02.png", iconSource))
+    //     return false;
+    //
+    // FWidgetLayout iconLayout;
+    // iconLayout.width = FLayoutLength::Units(24.0f);
+    // iconLayout.height = FLayoutLength::Units(24.0f);
+    //
+    // FImageStyle iconStyle;
+    // iconStyle.fit = EImageFit::Contain;
+    //
+    // if (!AddImage(*richButton, std::move(iconSource), iconLayout, iconStyle))
+    //     return false;
+    //
+    // // Text content
+    // ContainerWidget* textContent = AddContainer(
+    //     *richButton,
+    //     nullptr,
+    //     FWidgetLayout{},
+    //     MakeContainerLayout(
+    //         ELayoutDirection::Vertical,
+    //         2.0f,
+    //         EAlignment::Start,
+    //         EJustification::Center));
+    //
+    // if (!textContent)
+    //     return false;
+    //
+    // if (!AddText(*textContent, "Save Project", "PanelTitle") ||
+    //     !AddText(*textContent, "Write changes to disk", "Body"))
+    //     return false;
+    //
+    // // Click event
+    // m_PrimaryButtonClickConnection = richButton->OnClick().Connect(
+    //     [](FClickEvent& event)
+    //     {
+    //         event.MarkHandled();
+    //         std::cout << "[SilverwarePlayground]: Rich button clicked.\n";
+    //     });
 
     FWidgetTransformStyle transformStyleFontButton1;
 
@@ -1324,189 +1376,189 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     //     )
     //     return false;
 
-    // Checkbox list
-    FWidgetLayout checkboxListLayout;
-    checkboxListLayout.width = FLayoutLength::Units(180.0f);
-    checkboxListLayout.height = FLayoutLength::Auto();
+    // // Checkbox list
+    // FWidgetLayout checkboxListLayout;
+    // checkboxListLayout.width = FLayoutLength::Units(180.0f);
+    // checkboxListLayout.height = FLayoutLength::Auto();
+    //
+    // ContainerWidget *checkboxList = AddContainer(
+    //     *m_ButtonPlayground,
+    //     nullptr,
+    //     checkboxListLayout,
+    //     MakeContainerLayout(
+    //         ELayoutDirection::Vertical,
+    //         8.0f,
+    //         EAlignment::Start,
+    //         EJustification::Start));
+    //
+    // if (!checkboxList)
+    //     return false;
+    //
+    // if (!AddText(*checkboxList, "CHECKBOXES", "PanelTitle") ||
+    //     !AddText(*checkboxList, "Pointer, keyboard, checked and disabled states.", "Body"))
+    //     return false;
+    //
+    // // Checkbox rows
+    // FWidgetLayout checkboxRowLayout;
+    // checkboxRowLayout.width = FLayoutLength::Percent(100.0f);
+    // checkboxRowLayout.height = FLayoutLength::Units(26.0f);
+    //
+    // const FContainerLayout checkboxContentLayout = MakeContainerLayout(
+    //     ELayoutDirection::Horizontal,
+    //     0.0f,
+    //     EAlignment::Center,
+    //     EJustification::Start);
+    //
+    // CheckboxWidget *vsyncCheckbox = AddCheckbox(
+    //     *checkboxList,
+    //     "Enable VSync",
+    //     nullptr,
+    //     checkboxRowLayout,
+    //     checkboxContentLayout);
+    //
+    // if (!vsyncCheckbox)
+    //     return false;
+    //
+    // m_CheckboxChangedConnections[0] = vsyncCheckbox->OnCheckedChanged().Connect(
+    //     [](TValueChangedEvent<bool> &event) {
+    //         std::cout << "[SilverwarePlayground]: VSync checkbox "
+    //                 << (event.newValue ? "checked" : "unchecked") << ".\n";
+    //     });
+    //
+    // CheckboxWidget *hdrCheckbox = AddCheckbox(
+    //     *checkboxList,
+    //     "Enable HDR",
+    //     nullptr,
+    //     checkboxRowLayout,
+    //     checkboxContentLayout);
+    //
+    // if (!hdrCheckbox)
+    //     return false;
+    //
+    // hdrCheckbox->SetChecked(true);
+    //
+    // m_CheckboxChangedConnections[1] = hdrCheckbox->OnCheckedChanged().Connect(
+    //     [](TValueChangedEvent<bool> &event) {
+    //         std::cout << "[SilverwarePlayground]: HDR checkbox "
+    //                 << (event.newValue ? "checked" : "unchecked") << ".\n";
+    //     });
+    //
+    // CheckboxWidget *disabledCheckbox = AddCheckbox(
+    //     *checkboxList,
+    //     "Read-only setting",
+    //     nullptr,
+    //     checkboxRowLayout,
+    //     checkboxContentLayout);
+    //
+    // if (!disabledCheckbox)
+    //     return false;
+    //
+    // disabledCheckbox->SetChecked(true);
+    // disabledCheckbox->SetEnabled(false);
 
-    ContainerWidget *checkboxList = AddContainer(
-        *m_ButtonPlayground,
-        nullptr,
-        checkboxListLayout,
-        MakeContainerLayout(
-            ELayoutDirection::Vertical,
-            8.0f,
-            EAlignment::Start,
-            EJustification::Start));
-
-    if (!checkboxList)
-        return false;
-
-    if (!AddText(*checkboxList, "CHECKBOXES", "PanelTitle") ||
-        !AddText(*checkboxList, "Pointer, keyboard, checked and disabled states.", "Body"))
-        return false;
-
-    // Checkbox rows
-    FWidgetLayout checkboxRowLayout;
-    checkboxRowLayout.width = FLayoutLength::Percent(100.0f);
-    checkboxRowLayout.height = FLayoutLength::Units(26.0f);
-
-    const FContainerLayout checkboxContentLayout = MakeContainerLayout(
-        ELayoutDirection::Horizontal,
-        0.0f,
-        EAlignment::Center,
-        EJustification::Start);
-
-    CheckboxWidget *vsyncCheckbox = AddCheckbox(
-        *checkboxList,
-        "Enable VSync",
-        nullptr,
-        checkboxRowLayout,
-        checkboxContentLayout);
-
-    if (!vsyncCheckbox)
-        return false;
-
-    m_CheckboxChangedConnections[0] = vsyncCheckbox->OnCheckedChanged().Connect(
-        [](TValueChangedEvent<bool> &event) {
-            std::cout << "[SilverwarePlayground]: VSync checkbox "
-                    << (event.newValue ? "checked" : "unchecked") << ".\n";
-        });
-
-    CheckboxWidget *hdrCheckbox = AddCheckbox(
-        *checkboxList,
-        "Enable HDR",
-        nullptr,
-        checkboxRowLayout,
-        checkboxContentLayout);
-
-    if (!hdrCheckbox)
-        return false;
-
-    hdrCheckbox->SetChecked(true);
-
-    m_CheckboxChangedConnections[1] = hdrCheckbox->OnCheckedChanged().Connect(
-        [](TValueChangedEvent<bool> &event) {
-            std::cout << "[SilverwarePlayground]: HDR checkbox "
-                    << (event.newValue ? "checked" : "unchecked") << ".\n";
-        });
-
-    CheckboxWidget *disabledCheckbox = AddCheckbox(
-        *checkboxList,
-        "Read-only setting",
-        nullptr,
-        checkboxRowLayout,
-        checkboxContentLayout);
-
-    if (!disabledCheckbox)
-        return false;
-
-    disabledCheckbox->SetChecked(true);
-    disabledCheckbox->SetEnabled(false);
-
-    // Radio button group
-    FWidgetLayout radioButtonListLayout;
-    radioButtonListLayout.width = FLayoutLength::Units(220.0f);
-    radioButtonListLayout.height = FLayoutLength::Auto();
-
-    ContainerWidget* radioButtonList = AddContainer(
-        *m_ButtonPlayground,
-        nullptr,
-        radioButtonListLayout,
-        MakeContainerLayout(
-            ELayoutDirection::Vertical,
-            8.0f,
-            EAlignment::Start,
-            EJustification::Start));
-
-    if (!radioButtonList ||
-        !AddText(*radioButtonList, "RADIO BUTTONS", "PanelTitle") ||
-        !AddText(*radioButtonList, "Mutually exclusive rendering backend selection.", "Body"))
-    {
-        return false;
-    }
-
-    FWidgetLayout radioButtonRowLayout;
-    radioButtonRowLayout.width = FLayoutLength::Percent(100.0f);
-    radioButtonRowLayout.height = FLayoutLength::Units(26.0f);
-
-    const FContainerLayout radioButtonContentLayout = MakeContainerLayout(
-        ELayoutDirection::Horizontal,
-        0.0f,
-        EAlignment::Center,
-        EJustification::Start);
-
-    constexpr char kRenderingBackendGroup[] = "RenderingBackend";
-
-    RadioButtonWidget* openGLRadioButton = AddRadioButton(
-        *radioButtonList,
-        "OpenGL",
-        kRenderingBackendGroup,
-        radioButtonRowLayout,
-        radioButtonContentLayout);
-
-    RadioButtonWidget* vulkanRadioButton = AddRadioButton(
-        *radioButtonList,
-        "Vulkan",
-        kRenderingBackendGroup,
-        radioButtonRowLayout,
-        radioButtonContentLayout);
-
-    RadioButtonWidget* metalRadioButton = AddRadioButton(
-        *radioButtonList,
-        "Metal",
-        kRenderingBackendGroup,
-        radioButtonRowLayout,
-        radioButtonContentLayout);
-
-    RadioButtonWidget* directXRadioButton = AddRadioButton(
-        *radioButtonList,
-        "DirectX 12 (unavailable)",
-        kRenderingBackendGroup,
-        radioButtonRowLayout,
-        radioButtonContentLayout);
-
-    if (!openGLRadioButton || !vulkanRadioButton ||
-        !metalRadioButton || !directXRadioButton)
-    {
-        return false;
-    }
-
-    // The initial selection is established before the tree is attached to the context.
-    vulkanRadioButton->SetSelected(true);
-    directXRadioButton->SetEnabled(false);
-
-    m_RadioButtonChangedConnections[0] = openGLRadioButton->OnSelectedChanged().Connect(
-        [](TValueChangedEvent<bool>& event)
-        {
-            std::cout << "[SilverwarePlayground]: OpenGL radio button "
-                      << (event.newValue ? "selected" : "deselected") << ".\n";
-        });
-
-    m_RadioButtonChangedConnections[1] = vulkanRadioButton->OnSelectedChanged().Connect(
-        [](TValueChangedEvent<bool>& event)
-        {
-            std::cout << "[SilverwarePlayground]: Vulkan radio button "
-                      << (event.newValue ? "selected" : "deselected") << ".\n";
-        });
-
-    m_RadioButtonChangedConnections[2] = metalRadioButton->OnSelectedChanged().Connect(
-        [](TValueChangedEvent<bool>& event)
-        {
-            std::cout << "[SilverwarePlayground]: Metal radio button "
-                      << (event.newValue ? "selected" : "deselected") << ".\n";
-        });
-
-    m_RadioButtonChangedConnections[3] = directXRadioButton->OnSelectedChanged().Connect(
-        [](TValueChangedEvent<bool>& event)
-        {
-            std::cout << "[SilverwarePlayground]: DirectX 12 radio button "
-                      << (event.newValue ? "selected" : "deselected") << ".\n";
-        });
+    // // Radio button group
+    // FWidgetLayout radioButtonListLayout;
+    // radioButtonListLayout.width = FLayoutLength::Units(220.0f);
+    // radioButtonListLayout.height = FLayoutLength::Auto();
+    //
+    // ContainerWidget* radioButtonList = AddContainer(
+    //     *m_ButtonPlayground,
+    //     nullptr,
+    //     radioButtonListLayout,
+    //     MakeContainerLayout(
+    //         ELayoutDirection::Vertical,
+    //         8.0f,
+    //         EAlignment::Start,
+    //         EJustification::Start));
+    //
+    // if (!radioButtonList ||
+    //     !AddText(*radioButtonList, "RADIO BUTTONS", "PanelTitle") ||
+    //     !AddText(*radioButtonList, "Mutually exclusive rendering backend selection.", "Body"))
+    // {
+    //     return false;
+    // }
+    //
+    // FWidgetLayout radioButtonRowLayout;
+    // radioButtonRowLayout.width = FLayoutLength::Percent(100.0f);
+    // radioButtonRowLayout.height = FLayoutLength::Units(26.0f);
+    //
+    // const FContainerLayout radioButtonContentLayout = MakeContainerLayout(
+    //     ELayoutDirection::Horizontal,
+    //     0.0f,
+    //     EAlignment::Center,
+    //     EJustification::Start);
+    //
+    // constexpr char kRenderingBackendGroup[] = "RenderingBackend";
+    //
+    // RadioButtonWidget* openGLRadioButton = AddRadioButton(
+    //     *radioButtonList,
+    //     "OpenGL",
+    //     kRenderingBackendGroup,
+    //     radioButtonRowLayout,
+    //     radioButtonContentLayout);
+    //
+    // RadioButtonWidget* vulkanRadioButton = AddRadioButton(
+    //     *radioButtonList,
+    //     "Vulkan",
+    //     kRenderingBackendGroup,
+    //     radioButtonRowLayout,
+    //     radioButtonContentLayout);
+    //
+    // RadioButtonWidget* metalRadioButton = AddRadioButton(
+    //     *radioButtonList,
+    //     "Metal",
+    //     kRenderingBackendGroup,
+    //     radioButtonRowLayout,
+    //     radioButtonContentLayout);
+    //
+    // RadioButtonWidget* directXRadioButton = AddRadioButton(
+    //     *radioButtonList,
+    //     "DirectX 12 (unavailable)",
+    //     kRenderingBackendGroup,
+    //     radioButtonRowLayout,
+    //     radioButtonContentLayout);
+    //
+    // if (!openGLRadioButton || !vulkanRadioButton ||
+    //     !metalRadioButton || !directXRadioButton)
+    // {
+    //     return false;
+    // }
+    //
+    // // The initial selection is established before the tree is attached to the context.
+    // vulkanRadioButton->SetSelected(true);
+    // directXRadioButton->SetEnabled(false);
+    //
+    // m_RadioButtonChangedConnections[0] = openGLRadioButton->OnSelectedChanged().Connect(
+    //     [](TValueChangedEvent<bool>& event)
+    //     {
+    //         std::cout << "[SilverwarePlayground]: OpenGL radio button "
+    //                   << (event.newValue ? "selected" : "deselected") << ".\n";
+    //     });
+    //
+    // m_RadioButtonChangedConnections[1] = vulkanRadioButton->OnSelectedChanged().Connect(
+    //     [](TValueChangedEvent<bool>& event)
+    //     {
+    //         std::cout << "[SilverwarePlayground]: Vulkan radio button "
+    //                   << (event.newValue ? "selected" : "deselected") << ".\n";
+    //     });
+    //
+    // m_RadioButtonChangedConnections[2] = metalRadioButton->OnSelectedChanged().Connect(
+    //     [](TValueChangedEvent<bool>& event)
+    //     {
+    //         std::cout << "[SilverwarePlayground]: Metal radio button "
+    //                   << (event.newValue ? "selected" : "deselected") << ".\n";
+    //     });
+    //
+    // m_RadioButtonChangedConnections[3] = directXRadioButton->OnSelectedChanged().Connect(
+    //     [](TValueChangedEvent<bool>& event)
+    //     {
+    //         std::cout << "[SilverwarePlayground]: DirectX 12 radio button "
+    //                   << (event.newValue ? "selected" : "deselected") << ".\n";
+    //     });
 
     // Toggle examples
     FWidgetLayout toggleListLayout;
-    toggleListLayout.width = FLayoutLength::Units(200.0f);
+    toggleListLayout.width = FLayoutLength::Units(260.0f);
     toggleListLayout.height = FLayoutLength::Auto();
 
     ContainerWidget* toggleList = AddContainer(
@@ -1591,8 +1643,256 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         [](TValueChangedEvent<bool>& event)
         {
             std::cout << "[SilverwarePlayground]: Read-only feature "
-                      << (event.newValue ? "enabled" : "disabled") << ".\n";
+                        << (event.newValue ? "enabled" : "disabled") << ".\n";
         });
+
+    // Slider examples
+    FWidgetLayout sliderListLayout;
+    sliderListLayout.width = FLayoutLength::Units(340.0f);
+    sliderListLayout.height = FLayoutLength::Auto();
+
+    ContainerWidget* sliderList = AddContainer(
+        *m_ButtonPlayground,
+        nullptr,
+        sliderListLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Vertical,
+            10.0f,
+            EAlignment::Start,
+            EJustification::Start));
+
+    if (!sliderList ||
+        !AddText(*sliderList, "SLIDERS", "PanelTitle") ||
+        !AddText(*sliderList, "Pointer drag, keyboard adjustment, snapping and orientation.", "Body"))
+    {
+        return false;
+    }
+
+    const auto addHorizontalSliderSample = [this, sliderList](
+        const char* label,
+        double minimum,
+        double maximum,
+        double step,
+        double initialValue,
+        int precision,
+        const char* suffix,
+        std::size_t connectionIndex) -> bool
+    {
+        FWidgetLayout sampleLayout;
+        sampleLayout.width = FLayoutLength::Percent(100.0f);
+        sampleLayout.height = FLayoutLength::Auto();
+
+        ContainerWidget* sample = AddContainer(
+            *sliderList,
+            nullptr,
+            sampleLayout,
+            MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
+
+        if (!sample)
+            return false;
+
+        FWidgetLayout headerLayout;
+        headerLayout.width = FLayoutLength::Percent(100.0f);
+        headerLayout.height = FLayoutLength::Auto();
+
+        ContainerWidget* header = AddContainer(
+            *sample,
+            nullptr,
+            headerLayout,
+            MakeContainerLayout(
+                ELayoutDirection::Horizontal,
+                8.0f,
+                EAlignment::Center,
+                EJustification::Start));
+
+        if (!header || !AddText(*header, label, "Body"))
+            return false;
+
+        TextWidget* valueLabel = AddText(
+            *header,
+            FormatSliderValue(initialValue, precision, suffix),
+            "Mono");
+
+        if (!valueLabel)
+            return false;
+
+        FWidgetLayout sliderLayout;
+        sliderLayout.width = FLayoutLength::Units(280.0f);
+        sliderLayout.height = FLayoutLength::Units(24.0f);
+
+        SliderWidget* slider = AddSlider(
+            *sample,
+            "Default",
+            sliderLayout,
+            minimum,
+            maximum,
+            step,
+            initialValue);
+
+        if (!slider)
+            return false;
+
+        const std::string sampleName(label);
+        const std::string valueSuffix(suffix ? suffix : "");
+
+        m_SliderValueChangedConnections[connectionIndex] = slider->OnValueChanged().Connect(
+            [valueLabel, precision, valueSuffix](TValueChangedEvent<double>& event)
+            {
+                valueLabel->SetText(FormatSliderValue(
+                    event.newValue,
+                    precision,
+                    valueSuffix.c_str()));
+            });
+
+        m_SliderValueCommittedConnections[connectionIndex] = slider->OnValueChangeCommitted().Connect(
+            [sampleName, precision, valueSuffix](TValueChangeCommittedEvent<double>& event)
+            {
+                std::cout << "[SilverwarePlayground]: " << sampleName
+                          << " committed "
+                          << FormatSliderValue(event.oldValue, precision, valueSuffix.c_str())
+                          << " -> "
+                          << FormatSliderValue(event.newValue, precision, valueSuffix.c_str())
+                          << ".\n";
+            });
+
+        return true;
+    };
+
+    if (!addHorizontalSliderSample(
+            "Master Volume", 0.0, 100.0, 1.0, 68.0, 0, "%", 0) ||
+        !addHorizontalSliderSample(
+            "Render Scale", 50.0, 150.0, 5.0, 100.0, 0, "%", 1))
+    {
+        return false;
+    }
+
+    // Vertical slider: the value should increase as the thumb moves upward.
+    FWidgetLayout verticalSampleLayout;
+    verticalSampleLayout.width = FLayoutLength::Percent(100.0f);
+    verticalSampleLayout.height = FLayoutLength::Auto();
+
+    ContainerWidget* verticalSample = AddContainer(
+        *sliderList,
+        nullptr,
+        verticalSampleLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Horizontal,
+            12.0f,
+            EAlignment::Center,
+            EJustification::Start));
+
+    if (!verticalSample)
+        return false;
+
+    FWidgetLayout exposureInfoLayout;
+    exposureInfoLayout.width = FLayoutLength::Units(0.0f);
+    exposureInfoLayout.height = FLayoutLength::Auto();
+    exposureInfoLayout.flexGrow = 1.0f;
+
+    ContainerWidget* exposureInfo = AddContainer(
+        *verticalSample,
+        nullptr,
+        exposureInfoLayout,
+        MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
+
+    if (!exposureInfo ||
+        !AddText(*exposureInfo, "VERTICAL SLIDER", "Kicker"))
+    {
+        return false;
+    }
+
+    TextWidget* exposureValueLabel = AddText(*exposureInfo, "0.0 EV", "Mono");
+
+    if (!exposureValueLabel ||
+        !AddText(*exposureInfo, "Move upward to increase exposure.", "Body"))
+    {
+        return false;
+    }
+
+    FWidgetLayout verticalSliderLayout;
+    verticalSliderLayout.width = FLayoutLength::Units(24.0f);
+    verticalSliderLayout.height = FLayoutLength::Units(160.0f);
+
+    SliderWidget* exposureSlider = AddSlider(
+        *verticalSample,
+        "Vertical",
+        verticalSliderLayout,
+        -2.0,
+        2.0,
+        0.1,
+        0.0,
+        ESliderOrientation::Vertical);
+
+    if (!exposureSlider)
+        return false;
+
+    m_SliderValueChangedConnections[2] = exposureSlider->OnValueChanged().Connect(
+        [exposureValueLabel](TValueChangedEvent<double>& event)
+        {
+            exposureValueLabel->SetText(FormatSliderValue(event.newValue, 1, " EV"));
+        });
+
+    m_SliderValueCommittedConnections[2] = exposureSlider->OnValueChangeCommitted().Connect(
+        [](TValueChangeCommittedEvent<double>& event)
+        {
+            std::cout << "[SilverwarePlayground]: Exposure committed "
+                      << FormatSliderValue(event.oldValue, 1, " EV")
+                      << " -> "
+                      << FormatSliderValue(event.newValue, 1, " EV")
+                      << ".\n";
+        });
+
+    // Disabled-state sample. It should remain visible but ignore pointer and keyboard input.
+    FWidgetLayout disabledSliderSampleLayout;
+    disabledSliderSampleLayout.width = FLayoutLength::Percent(100.0f);
+    disabledSliderSampleLayout.height = FLayoutLength::Auto();
+
+    ContainerWidget* disabledSliderSample = AddContainer(
+        *sliderList,
+        nullptr,
+        disabledSliderSampleLayout,
+        MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
+
+    if (!disabledSliderSample)
+        return false;
+
+    FWidgetLayout disabledHeaderLayout;
+    disabledHeaderLayout.width = FLayoutLength::Percent(100.0f);
+    disabledHeaderLayout.height = FLayoutLength::Auto();
+
+    ContainerWidget* disabledHeader = AddContainer(
+        *disabledSliderSample,
+        nullptr,
+        disabledHeaderLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Horizontal,
+            8.0f,
+            EAlignment::Center,
+            EJustification::Start));
+
+    if (!disabledHeader || !AddText(*disabledHeader, "Read-only preview", "Body") ||
+        !AddText(*disabledHeader, "75%", "Mono"))
+    {
+        return false;
+    }
+
+    FWidgetLayout disabledSliderLayout;
+    disabledSliderLayout.width = FLayoutLength::Units(280.0f);
+    disabledSliderLayout.height = FLayoutLength::Units(24.0f);
+
+    SliderWidget* disabledSlider = AddSlider(
+        *disabledSliderSample,
+        "Default",
+        disabledSliderLayout,
+        0.0,
+        100.0,
+        5.0,
+        75.0);
+
+    if (!disabledSlider)
+        return false;
+
+    disabledSlider->SetEnabled(false);
 
     // Footer
     FWidgetLayout footerLayout;
@@ -1643,6 +1943,12 @@ void SilverwareEditorRenderer::Shutdown()
         connection.Disconnect();
 
     for (auto& connection : m_ToggleChangedConnections)
+        connection.Disconnect();
+
+    for (auto& connection : m_SliderValueChangedConnections)
+        connection.Disconnect();
+
+    for (auto& connection : m_SliderValueCommittedConnections)
         connection.Disconnect();
 
     m_ButtonPlayground = nullptr;
