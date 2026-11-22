@@ -14,6 +14,7 @@
 #include "Silverware/Core/Widgets/Styling/BackgroundStyle.h"
 #include "Silverware/UI/Widgets/TextWidget.h"
 
+#include <cstddef>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -29,25 +30,17 @@
 #include "Silverware/UI/Widgets/ToggleWidget.h"
 #include "Silverware/UI/Widgets/SliderWidget.h"
 #include "Silverware/UI/Widgets/RangedSliderWidget.h"
+#include "Silverware/UI/Widgets/ScrollViewWidget.h"
 
 namespace
 {
     using namespace Silverware;
-
-    constexpr char kBaseThemeID[] = "Redleaf.InkBlue.Base";
-    constexpr char kDarkThemeID[] = "Redleaf.InkBlue.Dark";
-    constexpr char kLightThemeID[] = "Redleaf.InkBlue.Light";
 
     struct FTypographySample
     {
         Silverware::TextWidget* widget = nullptr;
         Silverware::FTextStyle baseStyle;
     };
-
-    FStyleValue Token(const char* tokenID)
-    {
-        return FStyleTokenReference{std::string(tokenID)};
-    }
 
     void SetPadding(Silverware::FWidgetLayout &layout, float top, float right, float bottom, float left)
     {
@@ -95,6 +88,27 @@ namespace
         return rawWidget;
     }
 
+    Silverware::ScrollViewWidget* AddScrollView(
+        Silverware::ContainerWidget& parent,
+        Silverware::FWidgetLayout layout,
+        Silverware::EScrollbarVisibility horizontalVisibility = Silverware::EScrollbarVisibility::Auto,
+        Silverware::EScrollbarVisibility verticalVisibility = Silverware::EScrollbarVisibility::Auto)
+    {
+        using namespace Silverware;
+
+        auto widget = Silverware::MakeUnique<ScrollViewWidget>();
+        widget->SetStyleVariant("Default");
+        widget->SetLayout(std::move(layout));
+        widget->SetHorizontalScrollbarVisibility(horizontalVisibility);
+        widget->SetVerticalScrollbarVisibility(verticalVisibility);
+
+        ScrollViewWidget* rawWidget = widget.get();
+        if (!parent.AddChild(Silverware::TUniquePtr<CoreWidget>(widget.release())))
+            return nullptr;
+
+        return rawWidget;
+    }
+
     Silverware::TextWidget* AddText(
         Silverware::ContainerWidget& parent,
         std::string text,
@@ -136,48 +150,6 @@ namespace
             return nullptr;
 
         return rawWidget;
-    }
-
-    bool AddWidgetEffectSample(
-        Silverware::ContainerWidget& parent,
-        const char* label,
-        const char* description,
-        Silverware::FWidgetEffectStyle effectStyle,
-        Silverware::FColor backgroundColor)
-    {
-        using namespace Silverware;
-
-        if (!AddText(parent, label, "Kicker"))
-            return false;
-
-        FWidgetLayout cardLayout;
-        cardLayout.width = FLayoutLength::Percent(100.0f);
-        cardLayout.height = FLayoutLength::Units(54.0f);
-        SetPadding(cardLayout, 7.0f, 9.0f, 7.0f, 9.0f);
-
-        ContainerWidget* card = AddContainer(
-            parent,
-            nullptr,
-            cardLayout,
-            MakeContainerLayout(
-                ELayoutDirection::Vertical,
-                0.0f,
-                EAlignment::Start,
-                EJustification::Center));
-
-        if (!card)
-            return false;
-
-        FWidgetVisualStyle visualStyle;
-        visualStyle.backgroundColor = backgroundColor;
-        visualStyle.borderColor = FColor{0.27f, 0.34f, 0.45f, 0.9f};
-        visualStyle.borderWidth = 1.0f;
-        visualStyle.cornerRadius = 7.0f;
-
-        card->SetVisualStyle(std::move(visualStyle));
-        card->SetEffectStyle(std::move(effectStyle));
-
-        return AddText(*card, description, "Body") != nullptr;
     }
 
     bool AddFontEffectSample(
@@ -539,92 +511,137 @@ namespace
         return true;
     }
 
-    bool AddOverflowSamples(ContainerWidget &parent)
+    bool AddOverflowScrollViewSample(
+        ContainerWidget& parent,
+        const char* label,
+        bool bHorizontal)
+    {
+        using namespace Silverware;
+
+        if (!AddText(parent, label, "Kicker"))
+            return false;
+
+        FWidgetLayout scrollViewLayout;
+        scrollViewLayout.width = FLayoutLength::Percent(65.0f);
+        scrollViewLayout.height = FLayoutLength::Units(62.0f);
+
+        ScrollViewWidget* scrollView = AddScrollView(
+            parent,
+            scrollViewLayout,
+            bHorizontal ? EScrollbarVisibility::Always : EScrollbarVisibility::Hidden,
+            bHorizontal ? EScrollbarVisibility::Hidden : EScrollbarVisibility::Always);
+
+        if (!scrollView)
+            return false;
+
+        FTextStyle textStyle;
+        textStyle.fontSize = 11.0f;
+        textStyle.whiteSpace = bHorizontal ? EWhiteSpace::NoWrap : EWhiteSpace::Pre;
+
+        const std::string sampleText = bHorizontal
+            ? "This is a horizontally scrollable Silverware content sample. Drag the Silverware scrollbar thumb to reveal the rest of this long line."
+            : "VERTICAL SCROLL SAMPLE\nSECOND LINE\nTHIRD LINE\nFOURTH LINE\nFIFTH LINE\nSIXTH LINE\nSEVENTH LINE";
+
+        TextWidget* content = AddStyledText(
+            scrollView->GetContentWidget(),
+            sampleText,
+            std::move(textStyle));
+
+        if (!content)
+            return false;
+
+        FWidgetLayout contentLayout = content->GetLayout();
+        contentLayout.width = bHorizontal
+            ? FLayoutLength::Auto()
+            : FLayoutLength::Percent(100.0f);
+        contentLayout.height = FLayoutLength::Auto();
+        content->SetLayout(contentLayout);
+
+        return true;
+    }
+
+    bool AddOverflowSamples(ContainerWidget& parent)
     {
         using namespace Silverware;
 
         constexpr char kLongLine[] =
-                "This is deliberately long content that should extend beyond "
-                "the right boundary of its containing widget. It keeps going "
-                "to make overflow behavior easy to observe.";
+            "This is deliberately long content that should extend beyond "
+            "the right boundary of its containing widget. It keeps going "
+            "to make overflow behavior easy to observe.";
 
         if (!AddOverflowTextCase(
-            parent,
-            "VISIBLE / VISIBLE",
-            EOverflowMode::Visible,
-            EOverflowMode::Visible,
-            EClipMode::Auto,
-            EWhiteSpace::NoWrap,
-            kLongLine))
+                parent,
+                "VISIBLE / VISIBLE",
+                EOverflowMode::Visible,
+                EOverflowMode::Visible,
+                EClipMode::Auto,
+                EWhiteSpace::NoWrap,
+                kLongLine))
+        {
             return false;
+        }
 
         if (!AddOverflowTextCase(
-            parent,
-            "HIDDEN / HIDDEN",
-            EOverflowMode::Hidden,
-            EOverflowMode::Hidden,
-            EClipMode::Auto,
-            EWhiteSpace::NoWrap,
-            kLongLine))
+                parent,
+                "HIDDEN / HIDDEN",
+                EOverflowMode::Hidden,
+                EOverflowMode::Hidden,
+                EClipMode::Auto,
+                EWhiteSpace::NoWrap,
+                kLongLine))
+        {
             return false;
+        }
 
         if (!AddOverflowTextCase(
-            parent,
-            "HIDDEN X / VISIBLE Y",
-            EOverflowMode::Hidden,
-            EOverflowMode::Visible,
-            EClipMode::Auto,
-            EWhiteSpace::Pre,
-            "FIRST LINE - LONG CONTENT THAT EXTENDS OUTSIDE THE FRAME\n"
-            "SECOND LINE - THIS SHOULD ALSO CONTINUE BEYOND THE FRAME YOHOOOOOOOOOOOOOOOOOOOOOOOOO\n"
-            "THIRD LINE - MORE CONTENT TO TEST VERTICAL OVERFLOW\n"
-            "FOURTH LINE - STILL MORE CONTENT\n"
-            "FIFTH LINE - END OF TEST\n"
-            "SIXTH LINE - END OF TEST"))
+                parent,
+                "HIDDEN X / VISIBLE Y",
+                EOverflowMode::Hidden,
+                EOverflowMode::Visible,
+                EClipMode::Auto,
+                EWhiteSpace::Pre,
+                "FIRST LINE - LONG CONTENT THAT EXTENDS OUTSIDE THE FRAME\n"
+                "SECOND LINE - THIS SHOULD ALSO CONTINUE BEYOND THE FRAME YOHOOOOOOOOOOOOOOOOOOOOOOOOO\n"
+                "THIRD LINE - MORE CONTENT TO TEST VERTICAL OVERFLOW\n"
+                "FOURTH LINE - STILL MORE CONTENT\n"
+                "FIFTH LINE - END OF TEST\n"
+                "SIXTH LINE - END OF TEST"))
+        {
             return false;
+        }
+
+        if (!AddOverflowScrollViewSample(parent, "SILVERWARE SCROLL VIEW / HORIZONTAL", true) ||
+            !AddOverflowScrollViewSample(parent, "SILVERWARE SCROLL VIEW / VERTICAL", false))
+        {
+            return false;
+        }
 
         if (!AddOverflowTextCase(
-            parent,
-            "AUTO / HIDDEN",
-            EOverflowMode::Auto,
-            EOverflowMode::Hidden,
-            EClipMode::Auto,
-            EWhiteSpace::NoWrap,
-            kLongLine))
+                parent,
+                "TRANSFORMED CHILD - FORCED CLIPPING",
+                EOverflowMode::Hidden,
+                EOverflowMode::Hidden,
+                EClipMode::Always,
+                EWhiteSpace::NoWrap,
+                kLongLine,
+                true))
+        {
             return false;
+        }
 
         if (!AddOverflowTextCase(
-            parent,
-            "SCROLL / HIDDEN",
-            EOverflowMode::Scroll,
-            EOverflowMode::Hidden,
-            EClipMode::Auto,
-            EWhiteSpace::NoWrap,
-            kLongLine))
+                parent,
+                "TRANSFORMED CHILD - IGNORE ANCESTOR CLIP",
+                EOverflowMode::Hidden,
+                EOverflowMode::Hidden,
+                EClipMode::Always,
+                EWhiteSpace::NoWrap,
+                kLongLine,
+                true,
+                true))
+        {
             return false;
-
-        if (!AddOverflowTextCase(
-            parent,
-            "TRANSFORMED CHILD - FORCED CLIPPING",
-            EOverflowMode::Hidden,
-            EOverflowMode::Hidden,
-            EClipMode::Always,
-            EWhiteSpace::NoWrap,
-            kLongLine,
-            true))
-            return false;
-
-        if (!AddOverflowTextCase(
-            parent,
-            "TRANSFORMED CHILD - IGNORE ANCESTOR CLIP",
-            EOverflowMode::Hidden,
-            EOverflowMode::Hidden,
-            EClipMode::Always,
-            EWhiteSpace::NoWrap,
-            kLongLine,
-            true,
-            true))
-            return false;
+        }
 
         return true;
     }
@@ -1124,7 +1141,7 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     m_RootWidget->SetContainerLayout(MakeContainerLayout(
         ELayoutDirection::Vertical, 8.0f));
 
-    // Header
+    // Header.
     FWidgetLayout toolbarLayout;
     toolbarLayout.height = FLayoutLength::Units(54.0f);
     SetPadding(toolbarLayout, 0.0f, 14.0f, 0.0f, 14.0f);
@@ -1134,22 +1151,24 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         "Toolbar",
         toolbarLayout,
         MakeContainerLayout(
-            ELayoutDirection::Horizontal, 12.0f,
-            EAlignment::Center, EJustification::Start));
+            ELayoutDirection::Horizontal,
+            12.0f,
+            EAlignment::Center,
+            EJustification::Start));
 
     if (!toolbar ||
         !AddText(*toolbar, "SILVERWARE", "Accent") ||
         !AddText(*toolbar, "INTERACTION PLAYGROUND", "Header"))
+    {
         return false;
+    }
 
-    FWidgetLayout statusLayout;
-    statusLayout.height = FLayoutLength::Units(30.0f);
-    SetPadding(statusLayout, 0.0f, 10.0f, 0.0f, 10.0f);
-
-    // Main content
+    // Two independently scrollable columns.
     FWidgetLayout bodyLayout;
-    bodyLayout.height = FLayoutLength::Auto();
+    bodyLayout.width = FLayoutLength::Percent(100.0f);
+    bodyLayout.height = FLayoutLength::Units(0.0f);
     bodyLayout.flexGrow = 1.0f;
+    bodyLayout.flexShrink = 1.0f;
 
     ContainerWidget* body = AddContainer(
         *m_RootWidget,
@@ -1164,6 +1183,7 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     panelLayout.width = FLayoutLength::Units(0.0f);
     panelLayout.height = FLayoutLength::Percent(100.0f);
     panelLayout.flexGrow = 1.0f;
+    panelLayout.flexShrink = 1.0f;
     SetPadding(panelLayout, 14.0f, 14.0f, 14.0f, 14.0f);
 
     ContainerWidget* buttonPanel = AddContainer(
@@ -1172,7 +1192,6 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         panelLayout,
         MakeContainerLayout(ELayoutDirection::Vertical, 10.0f));
 
-    // Use the second column for widget and font effect samples for now.
     ContainerWidget* typographyPanel = AddContainer(
         *body,
         "Panel",
@@ -1182,210 +1201,239 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     if (!buttonPanel || !typographyPanel)
         return false;
 
-    if (!AddText(*buttonPanel, "BUTTONS", "PanelTitle") ||
-        !AddText(*buttonPanel, "Button interaction, focus and visual states.", "Body") ||
-        !AddText(*typographyPanel, "WIDGET + FONT EFFECTS", "PanelTitle") ||
-        !AddText(*typographyPanel, "Rendering and typography effect samples.", "Body"))
+    if (!AddText(*buttonPanel, "WIDGETS & CONTROLS", "PanelTitle") ||
+        !AddText(*buttonPanel, "Interaction, values, ranges and scrolling.", "Body") ||
+        !AddText(*typographyPanel, "TYPOGRAPHY & RENDERING", "PanelTitle") ||
+        !AddText(*typographyPanel, "Text shaping, typography, effects and overflow.", "Body"))
+    {
         return false;
+    }
 
     FWidgetLayout areaLayout;
-    areaLayout.height = FLayoutLength::Auto();
+    areaLayout.width = FLayoutLength::Percent(100.0f);
+    areaLayout.height = FLayoutLength::Units(0.0f);
     areaLayout.flexGrow = 1.0f;
-    SetPadding(areaLayout, 12.0f, 12.0f, 12.0f, 12.0f);
+    areaLayout.flexShrink = 1.0f;
+    SetPadding(areaLayout, 12.0f, 6.0f, 12.0f, 12.0f);
 
-    m_ButtonPlayground = AddContainer(
+    ContainerWidget* buttonScrollArea = AddContainer(
         *buttonPanel,
         "PlaygroundArea",
         areaLayout,
-        MakeContainerLayout(ELayoutDirection::Vertical, 8.0f));
+        MakeContainerLayout(ELayoutDirection::Vertical, 0.0f));
 
-    ContainerWidget* typographyArea = AddContainer(
+    ContainerWidget* typographyScrollArea = AddContainer(
         *typographyPanel,
         "PlaygroundArea",
         areaLayout,
-        MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
+        MakeContainerLayout(ELayoutDirection::Vertical, 0.0f));
 
-    std::vector<FTypographySample> typographySamples;
-
-    if (!m_ButtonPlayground || !typographyArea ||
-        !AddFontEffectSamples(*typographyArea, typographySamples))
+    if (!buttonScrollArea || !typographyScrollArea)
         return false;
 
-    // The interaction column now contains several control examples.
-    FWidgetOverflowStyle playgroundOverflow;
-    playgroundOverflow.overflowY = EOverflowMode::Auto;
-    m_ButtonPlayground->SetOverflowStyle(std::move(playgroundOverflow));
+    FWidgetLayout scrollViewLayout;
+    scrollViewLayout.width = FLayoutLength::Percent(100.0f);
+    scrollViewLayout.height = FLayoutLength::Percent(100.0f);
 
-    // Rich content button
-    FWidgetLayout buttonLayout;
-    buttonLayout.width = FLayoutLength::Units(240.0f);
-    buttonLayout.height = FLayoutLength::Units(58.0f);
-    SetPadding(buttonLayout, 8.0f, 8.0f, 8.0f, 8.0f);
-    //
-    // ButtonWidget* richButton = AddButton(
-    //     *m_ButtonPlayground,
-    //     "Primary",
-    //     buttonLayout,
-    //     MakeContainerLayout(
-    //         ELayoutDirection::Horizontal,
-    //         10.0f,
-    //         EAlignment::Center,
-    //         EJustification::Center));
-    //
-    // if (!richButton)
-    //     return false;
-    //
-    // // Icon
-    // FResourcePath iconSource;
-    //
-    // if (!FResourcePath::TryParse("silverware:/Textures/save02.png", iconSource))
-    //     return false;
-    //
-    // FWidgetLayout iconLayout;
-    // iconLayout.width = FLayoutLength::Units(24.0f);
-    // iconLayout.height = FLayoutLength::Units(24.0f);
-    //
-    // FImageStyle iconStyle;
-    // iconStyle.fit = EImageFit::Contain;
-    //
-    // if (!AddImage(*richButton, std::move(iconSource), iconLayout, iconStyle))
-    //     return false;
-    //
-    // // Text content
-    // ContainerWidget* textContent = AddContainer(
-    //     *richButton,
-    //     nullptr,
-    //     FWidgetLayout{},
-    //     MakeContainerLayout(
-    //         ELayoutDirection::Vertical,
-    //         2.0f,
-    //         EAlignment::Start,
-    //         EJustification::Center));
-    //
-    // if (!textContent)
-    //     return false;
-    //
-    // if (!AddText(*textContent, "Save Project", "PanelTitle") ||
-    //     !AddText(*textContent, "Write changes to disk", "Body"))
-    //     return false;
-    //
-    // // Click event
-    // m_PrimaryButtonClickConnection = richButton->OnClick().Connect(
-    //     [](FClickEvent& event)
-    //     {
-    //         event.MarkHandled();
-    //         std::cout << "[SilverwarePlayground]: Rich button clicked.\n";
-    //     });
+    ScrollViewWidget* buttonScrollView = AddScrollView(
+        *buttonScrollArea,
+        scrollViewLayout,
+        EScrollbarVisibility::Auto,
+        EScrollbarVisibility::Auto);
 
-    FWidgetTransformStyle transformStyleFontButton1;
+    ScrollViewWidget* typographyScrollView = AddScrollView(
+        *typographyScrollArea,
+        scrollViewLayout,
+        EScrollbarVisibility::Auto,
+        EScrollbarVisibility::Auto);
 
-    transformStyleFontButton1.operations = FTransformOperationList
+    if (!buttonScrollView || !typographyScrollView)
+        return false;
+
+    m_ButtonPlayground = &buttonScrollView->GetContentWidget();
+    ContainerWidget& typographyContent = typographyScrollView->GetContentWidget();
+
+    m_ButtonPlayground->SetContainerLayout(
+        MakeContainerLayout(ELayoutDirection::Vertical, 12.0f, EAlignment::Start));
+    typographyContent.SetContainerLayout(
+        MakeContainerLayout(ELayoutDirection::Vertical, 12.0f, EAlignment::Start));
+
+    // Build typography samples first. The font buttons below update these samples.
+    std::vector<FTypographySample> typographySamples;
+
+    if (!AddFontEffectSamples(typographyContent, typographySamples) ||
+        !AddTypographySamples(typographyContent, typographySamples) ||
+        !AddTextOverflowSamples(typographyContent, typographySamples))
     {
-        FTranslateTransform{
-            FLayoutLength::Units(32.0f),
-            FLayoutLength::Units(52.0f)
-        },
-        FRotateTransform{-9.0f},
+        return false;
+    }
+
+    FWidgetEffectStyle outlineEffect;
+    outlineEffect.boxOutline = FBoxOutline{
+        FColor{0.28f, 0.72f, 1.0f, 1.0f},
+        2.0f,
+        1.0f,
+        EBorderStyle::Solid
     };
 
+    FWidgetEffectStyle shadowEffect;
+    shadowEffect.boxShadows = FBoxShadowList{
+        FBoxShadow{
+            FColor{0.05f, 0.45f, 0.95f, 0.55f},
+            0.0f,
+            5.0f,
+            12.0f,
+            1.0f,
+            false
+        }
+    };
+
+    FWidgetEffectStyle blurEffect;
+    blurEffect.filters = FWidgetFilterList{FGaussianBlurFilter{1.5f}};
+
+    FWidgetEffectStyle backdropBlurEffect;
+    backdropBlurEffect.backdropFilters = FWidgetFilterList{FGaussianBlurFilter{2.5f}};
+
+    // Rich-content button.
+    if (!AddText(*m_ButtonPlayground, "BUTTONS", "PanelTitle") ||
+        !AddText(*m_ButtonPlayground, "Content composition, activation and font switching.", "Body"))
+    {
+        return false;
+    }
+
+    FWidgetLayout buttonLayout;
+    buttonLayout.width = FLayoutLength::Units(258.0f);
+    buttonLayout.height = FLayoutLength::Units(76.0f);
+    SetPadding(buttonLayout, 8.0f, 8.0f, 8.0f, 8.0f);
+
+    ButtonWidget* richButton = AddButton(
+        *m_ButtonPlayground,
+        "Primary",
+        buttonLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Horizontal,
+            10.0f,
+            EAlignment::Center,
+            EJustification::Center));
+
+    if (!richButton)
+        return false;
+
+    FResourcePath iconSource;
+    if (!FResourcePath::TryParse("silverware:/Textures/save02.png", iconSource))
+        return false;
+
+    FWidgetLayout iconLayout;
+    iconLayout.width = FLayoutLength::Units(24.0f);
+    iconLayout.height = FLayoutLength::Units(24.0f);
+
+    FImageStyle iconStyle;
+    iconStyle.fit = EImageFit::Contain;
+
+    if (!AddImage(*richButton, std::move(iconSource), iconLayout, iconStyle))
+        return false;
+
+    ContainerWidget* textContent = AddContainer(
+        *richButton,
+        nullptr,
+        FWidgetLayout{},
+        MakeContainerLayout(
+            ELayoutDirection::Vertical,
+            2.0f,
+            EAlignment::Start,
+            EJustification::Center));
+
+    if (!textContent ||
+        !AddText(*textContent, "Save Project", "PanelTitle") ||
+        !AddText(*textContent, "Write changes to disk", "Body"))
+    {
+        return false;
+    }
+
+    m_PrimaryButtonClickConnection = richButton->OnClick().Connect(
+        [](FClickEvent& event)
+        {
+            event.MarkHandled();
+            std::cout << "[SilverwarePlayground]: Rich button clicked.\n";
+        });
+
+    // Font-switching buttons. The transforms also exercise transformed layout/hit testing.
+    FWidgetTransformStyle transformStyleFontButton1;
+    transformStyleFontButton1.operations = FTransformOperationList{
+        FTranslateTransform{FLayoutLength::Units(32.0f), FLayoutLength::Units(52.0f)},
+        FRotateTransform{-9.0f}
+    };
     transformStyleFontButton1.origin = FTransformOrigin{
-        FLayoutLength::Percent(50.0f),
-        FLayoutLength::Percent(50.0f)
+        FLayoutLength::Percent(50.0f), FLayoutLength::Percent(50.0f)
     };
 
     FWidgetTransformStyle transformStyleFontButton2;
-
-    transformStyleFontButton2.operations = FTransformOperationList
-    {
-        FTranslateTransform{
-            FLayoutLength::Units(350.0f),
-            FLayoutLength::Units(60.0f)
-        },
-        FRotateTransform{12.0f},
+    transformStyleFontButton2.operations = FTransformOperationList{
+        FTranslateTransform{FLayoutLength::Units(350.0f), FLayoutLength::Units(60.0f)},
+        FRotateTransform{12.0f}
     };
-
     transformStyleFontButton2.origin = FTransformOrigin{
-        FLayoutLength::Percent(50.0f),
-        FLayoutLength::Percent(50.0f)
+        FLayoutLength::Percent(50.0f), FLayoutLength::Percent(50.0f)
     };
 
     FWidgetTransformStyle transformStyleFontButton3;
-
-    transformStyleFontButton3.operations = FTransformOperationList
-    {
-        FTranslateTransform{
-            FLayoutLength::Units(78.0f),
-            FLayoutLength::Units(110.0f)
-        },
-        FRotateTransform{15.0f},
+    transformStyleFontButton3.operations = FTransformOperationList{
+        FTranslateTransform{FLayoutLength::Units(78.0f), FLayoutLength::Units(110.0f)},
+        FRotateTransform{15.0f}
     };
-
     transformStyleFontButton3.origin = FTransformOrigin{
-        FLayoutLength::Percent(50.0f),
-        FLayoutLength::Percent(50.0f)
+        FLayoutLength::Percent(50.0f), FLayoutLength::Percent(50.0f)
     };
 
     FWidgetVisualStyle fontButtonVisualStyle;
-
     FLinearGradient fontButtonGradient;
     fontButtonGradient.angleDegrees = 180.0f;
     fontButtonGradient.stops = {
-        { FColor{0.30f, 0.40f, 0.54f, 1.0f}, 0.0f },
-        { FColor{0.20f, 0.30f, 0.44f, 1.0f}, 0.5f },
-        { FColor{0.13f, 0.21f, 0.33f, 1.0f}, 1.0f }
+        {FColor{0.30f, 0.40f, 0.54f, 1.0f}, 0.0f},
+        {FColor{0.20f, 0.30f, 0.44f, 1.0f}, 0.5f},
+        {FColor{0.13f, 0.21f, 0.33f, 1.0f}, 1.0f}
     };
-
-    fontButtonVisualStyle.backgroundLayers = FBackgroundLayerList{
-        FGradient{fontButtonGradient}
-    };
-
+    fontButtonVisualStyle.backgroundLayers = FBackgroundLayerList{FGradient{fontButtonGradient}};
     fontButtonVisualStyle.borderColor = FColor{0.48f, 0.59f, 0.72f, 0.65f};
     fontButtonVisualStyle.borderWidth = 2.0f;
     fontButtonVisualStyle.borderStyle = EBorderStyle::Dashed;
     fontButtonVisualStyle.cornerRadius = 7.0f;
-    fontButtonVisualStyle.bottomRightRadius = 30.f;
-    fontButtonVisualStyle.topLeftRadius = 20.f;
+    fontButtonVisualStyle.bottomRightRadius = 30.0f;
+    fontButtonVisualStyle.topLeftRadius = 20.0f;
 
     FWidgetVisualStyle inkBlueButtonStyle;
-
-    inkBlueButtonStyle.backgroundColor = FColor{
-        0.341f, 0.420f, 0.502f, 1.0f // #576B80
-    };
+    inkBlueButtonStyle.backgroundColor = FColor{0.341f, 0.420f, 0.502f, 1.0f};
 
     FLinearGradient inkBlueGradient;
     inkBlueGradient.angleDegrees = 180.0f;
     inkBlueGradient.stops = {
-        { FColor{0.369f, 0.478f, 0.580f, 1.0f}, 0.0f }, // #5E7A94
-        { FColor{0.341f, 0.420f, 0.502f, 1.0f}, 0.45f }, // #576B80
-        { FColor{0.271f, 0.345f, 0.420f, 1.0f}, 1.0f } // #45586B
+        {FColor{0.369f, 0.478f, 0.580f, 1.0f}, 0.0f},
+        {FColor{0.341f, 0.420f, 0.502f, 1.0f}, 0.45f},
+        {FColor{0.271f, 0.345f, 0.420f, 1.0f}, 1.0f}
     };
-
-    inkBlueButtonStyle.backgroundLayers = FBackgroundLayerList{
-        FGradient{inkBlueGradient}
-    };
-
-    inkBlueButtonStyle.borderColor = FColor{
-        0.341f, 0.420f, 0.502f, 1.0f
-    };
-
+    inkBlueButtonStyle.backgroundLayers = FBackgroundLayerList{FGradient{inkBlueGradient}};
+    inkBlueButtonStyle.borderColor = FColor{0.341f, 0.420f, 0.502f, 1.0f};
     inkBlueButtonStyle.borderWidth = 1.0f;
     inkBlueButtonStyle.borderStyle = EBorderStyle::Solid;
     inkBlueButtonStyle.cornerRadius = 3.0f;
 
     const auto addFontButton = [
-                this,
-                &typographySamples,
-                transformStyleFontButton1,
-                transformStyleFontButton2,
-                transformStyleFontButton3, buttonLayout, fontButtonVisualStyle, inkBlueButtonStyle
-            ](
-        std::size_t connectionIndex,
-        const char *label,
-        std::string fontFamily) -> bool {
+        this,
+        &typographySamples,
+        transformStyleFontButton1,
+        transformStyleFontButton2,
+        transformStyleFontButton3,
+        buttonLayout,
+        fontButtonVisualStyle,
+        inkBlueButtonStyle](
+            std::size_t connectionIndex,
+            const char* label,
+            std::string fontFamily) -> bool
+    {
         if (connectionIndex >= 3)
             return false;
 
-        ButtonWidget *button = AddButton(
+        ButtonWidget* button = AddButton(
             *m_ButtonPlayground,
             "Primary",
             buttonLayout,
@@ -1398,7 +1446,6 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         if (!button)
             return false;
 
-
         switch (connectionIndex)
         {
             case 0:
@@ -1406,324 +1453,277 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
                 button->SetVisualStyle(inkBlueButtonStyle);
                 button->SetEnterKeyActivationEnabled(true);
                 break;
-
             case 1:
                 button->SetTransformStyle(transformStyleFontButton2);
                 button->SetVisualStyle(fontButtonVisualStyle);
-                button->SetEnabled(false);
                 break;
-
             case 2:
                 button->SetTransformStyle(transformStyleFontButton3);
                 button->SetVisualStyle(inkBlueButtonStyle);
                 button->SetSpaceKeyActivationEnabled(true);
                 break;
+            default:
+                return false;
         }
 
         if (!AddText(*button, label, "ButtonLabel"))
             return false;
 
         const std::vector<FTypographySample> samples = typographySamples;
+        m_FontButtonClickConnections[connectionIndex] = button->OnClick().Connect(
+            [samples, fontFamily = std::move(fontFamily)](FClickEvent& event)
+            {
+                event.MarkHandled();
 
-        m_FontButtonClickConnections[connectionIndex] =
-                button->OnClick().Connect(
-                    [samples, fontFamily = std::move(fontFamily)](FClickEvent &event) {
-                        event.MarkHandled();
+                for (const FTypographySample& sample : samples)
+                {
+                    if (!sample.widget)
+                        continue;
 
-                        for (const FTypographySample &sample: samples)
-                        {
-                            if (!sample.widget)
-                                continue;
+                    FTextStyle style = sample.baseStyle;
+                    style.fontFamily = fontFamily;
+                    sample.widget->SetTextStyle(std::move(style));
+                }
 
-                            FTextStyle style = sample.baseStyle;
-                            style.fontFamily = fontFamily;
-                            sample.widget->SetTextStyle(std::move(style));
-                        }
-
-                        std::cout << "[SilverwarePlayground]: Typography font changed to "
-                                << fontFamily << ".\n";
-                    });
+                std::cout << "[SilverwarePlayground]: Typography font changed to "
+                          << fontFamily << ".\n";
+            });
 
         return true;
     };
 
-    // if (!addFontButton(0, "FunnelSans", "Funnel Sans") ||
-    //     !addFontButton(1, "RobotoMono", "Roboto Mono")
-    //     // || !addFontButton(2, "LatoLatin", "LatoLatin")
-    //     )
-    //     return false;
+    if (!addFontButton(0, "FunnelSans", "Funnel Sans") ||
+        !addFontButton(1, "RobotoMono", "Roboto Mono")
+        // || !addFontButton(2, "LatoLatin", "LatoLatin")
+        )
+    {
+        return false;
+    }
 
-    // // Checkbox list
-    // FWidgetLayout checkboxListLayout;
-    // checkboxListLayout.width = FLayoutLength::Units(180.0f);
-    // checkboxListLayout.height = FLayoutLength::Auto();
-    //
-    // ContainerWidget *checkboxList = AddContainer(
-    //     *m_ButtonPlayground,
-    //     nullptr,
-    //     checkboxListLayout,
-    //     MakeContainerLayout(
-    //         ELayoutDirection::Vertical,
-    //         8.0f,
-    //         EAlignment::Start,
-    //         EJustification::Start));
-    //
-    // if (!checkboxList)
-    //     return false;
-    //
-    // if (!AddText(*checkboxList, "CHECKBOXES", "PanelTitle") ||
-    //     !AddText(*checkboxList, "Pointer, keyboard, checked and disabled states.", "Body"))
-    //     return false;
-    //
-    // // Checkbox rows
-    // FWidgetLayout checkboxRowLayout;
-    // checkboxRowLayout.width = FLayoutLength::Percent(100.0f);
-    // checkboxRowLayout.height = FLayoutLength::Units(26.0f);
-    //
-    // const FContainerLayout checkboxContentLayout = MakeContainerLayout(
-    //     ELayoutDirection::Horizontal,
-    //     0.0f,
-    //     EAlignment::Center,
-    //     EJustification::Start);
-    //
-    // CheckboxWidget *vsyncCheckbox = AddCheckbox(
-    //     *checkboxList,
-    //     "Enable VSync",
-    //     nullptr,
-    //     checkboxRowLayout,
-    //     checkboxContentLayout);
-    //
-    // if (!vsyncCheckbox)
-    //     return false;
-    //
-    // m_CheckboxChangedConnections[0] = vsyncCheckbox->OnCheckedChanged().Connect(
-    //     [](TValueChangedEvent<bool> &event) {
-    //         std::cout << "[SilverwarePlayground]: VSync checkbox "
-    //                 << (event.newValue ? "checked" : "unchecked") << ".\n";
-    //     });
-    //
-    // CheckboxWidget *hdrCheckbox = AddCheckbox(
-    //     *checkboxList,
-    //     "Enable HDR",
-    //     nullptr,
-    //     checkboxRowLayout,
-    //     checkboxContentLayout);
-    //
-    // if (!hdrCheckbox)
-    //     return false;
-    //
-    // hdrCheckbox->SetChecked(true);
-    //
-    // m_CheckboxChangedConnections[1] = hdrCheckbox->OnCheckedChanged().Connect(
-    //     [](TValueChangedEvent<bool> &event) {
-    //         std::cout << "[SilverwarePlayground]: HDR checkbox "
-    //                 << (event.newValue ? "checked" : "unchecked") << ".\n";
-    //     });
-    //
-    // CheckboxWidget *disabledCheckbox = AddCheckbox(
-    //     *checkboxList,
-    //     "Read-only setting",
-    //     nullptr,
-    //     checkboxRowLayout,
-    //     checkboxContentLayout);
-    //
-    // if (!disabledCheckbox)
-    //     return false;
-    //
-    // disabledCheckbox->SetChecked(true);
-    // disabledCheckbox->SetEnabled(false);
+    // Checkboxes.
+    FWidgetLayout checkboxListLayout;
+    checkboxListLayout.width = FLayoutLength::Units(220.0f);
+    checkboxListLayout.height = FLayoutLength::Auto();
 
-    // // Radio button group
-    // FWidgetLayout radioButtonListLayout;
-    // radioButtonListLayout.width = FLayoutLength::Units(220.0f);
-    // radioButtonListLayout.height = FLayoutLength::Auto();
-    //
-    // ContainerWidget* radioButtonList = AddContainer(
-    //     *m_ButtonPlayground,
-    //     nullptr,
-    //     radioButtonListLayout,
-    //     MakeContainerLayout(
-    //         ELayoutDirection::Vertical,
-    //         8.0f,
-    //         EAlignment::Start,
-    //         EJustification::Start));
-    //
-    // if (!radioButtonList ||
-    //     !AddText(*radioButtonList, "RADIO BUTTONS", "PanelTitle") ||
-    //     !AddText(*radioButtonList, "Mutually exclusive rendering backend selection.", "Body"))
-    // {
-    //     return false;
-    // }
-    //
-    // FWidgetLayout radioButtonRowLayout;
-    // radioButtonRowLayout.width = FLayoutLength::Percent(100.0f);
-    // radioButtonRowLayout.height = FLayoutLength::Units(26.0f);
-    //
-    // const FContainerLayout radioButtonContentLayout = MakeContainerLayout(
-    //     ELayoutDirection::Horizontal,
-    //     0.0f,
-    //     EAlignment::Center,
-    //     EJustification::Start);
-    //
-    // constexpr char kRenderingBackendGroup[] = "RenderingBackend";
-    //
-    // RadioButtonWidget* openGLRadioButton = AddRadioButton(
-    //     *radioButtonList,
-    //     "OpenGL",
-    //     kRenderingBackendGroup,
-    //     radioButtonRowLayout,
-    //     radioButtonContentLayout);
-    //
-    // RadioButtonWidget* vulkanRadioButton = AddRadioButton(
-    //     *radioButtonList,
-    //     "Vulkan",
-    //     kRenderingBackendGroup,
-    //     radioButtonRowLayout,
-    //     radioButtonContentLayout);
-    //
-    // RadioButtonWidget* metalRadioButton = AddRadioButton(
-    //     *radioButtonList,
-    //     "Metal",
-    //     kRenderingBackendGroup,
-    //     radioButtonRowLayout,
-    //     radioButtonContentLayout);
-    //
-    // RadioButtonWidget* directXRadioButton = AddRadioButton(
-    //     *radioButtonList,
-    //     "DirectX 12 (unavailable)",
-    //     kRenderingBackendGroup,
-    //     radioButtonRowLayout,
-    //     radioButtonContentLayout);
-    //
-    // if (!openGLRadioButton || !vulkanRadioButton ||
-    //     !metalRadioButton || !directXRadioButton)
-    // {
-    //     return false;
-    // }
-    //
-    // // The initial selection is established before the tree is attached to the context.
-    // vulkanRadioButton->SetSelected(true);
-    // directXRadioButton->SetEnabled(false);
-    //
-    // m_RadioButtonChangedConnections[0] = openGLRadioButton->OnSelectedChanged().Connect(
-    //     [](TValueChangedEvent<bool>& event)
-    //     {
-    //         std::cout << "[SilverwarePlayground]: OpenGL radio button "
-    //                   << (event.newValue ? "selected" : "deselected") << ".\n";
-    //     });
-    //
-    // m_RadioButtonChangedConnections[1] = vulkanRadioButton->OnSelectedChanged().Connect(
-    //     [](TValueChangedEvent<bool>& event)
-    //     {
-    //         std::cout << "[SilverwarePlayground]: Vulkan radio button "
-    //                   << (event.newValue ? "selected" : "deselected") << ".\n";
-    //     });
-    //
-    // m_RadioButtonChangedConnections[2] = metalRadioButton->OnSelectedChanged().Connect(
-    //     [](TValueChangedEvent<bool>& event)
-    //     {
-    //         std::cout << "[SilverwarePlayground]: Metal radio button "
-    //                   << (event.newValue ? "selected" : "deselected") << ".\n";
-    //     });
-    //
-    // m_RadioButtonChangedConnections[3] = directXRadioButton->OnSelectedChanged().Connect(
-    //     [](TValueChangedEvent<bool>& event)
-    //     {
-    //         std::cout << "[SilverwarePlayground]: DirectX 12 radio button "
-    //                   << (event.newValue ? "selected" : "deselected") << ".\n";
-    //     });
+    ContainerWidget* checkboxList = AddContainer(
+        *m_ButtonPlayground,
+        nullptr,
+        checkboxListLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Vertical,
+            8.0f,
+            EAlignment::Start,
+            EJustification::Start));
 
-    // // Toggle examples
-    // FWidgetLayout toggleListLayout;
-    // toggleListLayout.width = FLayoutLength::Units(260.0f);
-    // toggleListLayout.height = FLayoutLength::Auto();
-    //
-    // ContainerWidget* toggleList = AddContainer(
-    //     *m_ButtonPlayground,
-    //     nullptr,
-    //     toggleListLayout,
-    //     MakeContainerLayout(
-    //         ELayoutDirection::Vertical,
-    //         8.0f,
-    //         EAlignment::Start,
-    //         EJustification::Start));
-    //
-    // if (!toggleList ||
-    //     !AddText(*toggleList, "TOGGLES", "PanelTitle") ||
-    //     !AddText(*toggleList, "Independent on/off controls with animated thumbs.", "Body"))
-    // {
-    //     return false;
-    // }
-    //
-    // FWidgetLayout toggleRowLayout;
-    // toggleRowLayout.width = FLayoutLength::Percent(100.0f);
-    // toggleRowLayout.height = FLayoutLength::Units(28.0f);
-    //
-    // ToggleWidget* temporalUpscalingToggle = AddToggle(
-    //     *toggleList,
-    //     "Temporal Upscaling",
-    //     "Default",
-    //     toggleRowLayout);
-    //
-    // ToggleWidget* dynamicResolutionToggle = AddToggle(
-    //     *toggleList,
-    //     "Dynamic Resolution",
-    //     "Default",
-    //     toggleRowLayout);
-    //
-    // ToggleWidget* rayTracingToggle = AddToggle(
-    //     *toggleList,
-    //     "Ray Tracing",
-    //     "Default",
-    //     toggleRowLayout);
-    //
-    // ToggleWidget* disabledToggle = AddToggle(
-    //     *toggleList,
-    //     "Read-only feature",
-    //     "Default",
-    //     toggleRowLayout);
-    //
-    // if (!temporalUpscalingToggle || !dynamicResolutionToggle ||
-    //     !rayTracingToggle || !disabledToggle)
-    // {
-    //     return false;
-    // }
-    //
-    // // Establish initial values before the root tree is attached to the UI context.
-    // temporalUpscalingToggle->SetOn(true);
-    // rayTracingToggle->SetOn(true);
-    // disabledToggle->SetOn(true);
-    // disabledToggle->SetEnabled(false);
-    //
-    // m_ToggleChangedConnections[0] = temporalUpscalingToggle->OnToggledChanged().Connect(
-    //     [](TValueChangedEvent<bool>& event)
-    //     {
-    //         std::cout << "[SilverwarePlayground]: Temporal Upscaling "
-    //                   << (event.newValue ? "enabled" : "disabled") << ".\n";
-    //     });
-    //
-    // m_ToggleChangedConnections[1] = dynamicResolutionToggle->OnToggledChanged().Connect(
-    //     [](TValueChangedEvent<bool>& event)
-    //     {
-    //         std::cout << "[SilverwarePlayground]: Dynamic Resolution "
-    //                   << (event.newValue ? "enabled" : "disabled") << ".\n";
-    //     });
-    //
-    // m_ToggleChangedConnections[2] = rayTracingToggle->OnToggledChanged().Connect(
-    //     [](TValueChangedEvent<bool>& event)
-    //     {
-    //         std::cout << "[SilverwarePlayground]: Ray Tracing "
-    //                   << (event.newValue ? "enabled" : "disabled") << ".\n";
-    //     });
-    //
-    // m_ToggleChangedConnections[3] = disabledToggle->OnToggledChanged().Connect(
-    //     [](TValueChangedEvent<bool>& event)
-    //     {
-    //         std::cout << "[SilverwarePlayground]: Read-only feature "
-    //                     << (event.newValue ? "enabled" : "disabled") << ".\n";
-    //     });
+    if (!checkboxList ||
+        !AddText(*checkboxList, "CHECKBOXES", "PanelTitle") ||
+        !AddText(*checkboxList, "Pointer, keyboard, checked and disabled states.", "Body"))
+    {
+        return false;
+    }
 
-    // Slider examples
+    FWidgetLayout checkboxRowLayout;
+    checkboxRowLayout.width = FLayoutLength::Percent(100.0f);
+    checkboxRowLayout.height = FLayoutLength::Units(26.0f);
+
+    const FContainerLayout checkboxContentLayout = MakeContainerLayout(
+        ELayoutDirection::Horizontal,
+        0.0f,
+        EAlignment::Center,
+        EJustification::Start);
+
+    CheckboxWidget* vsyncCheckbox = AddCheckbox(
+        *checkboxList, "Enable VSync", nullptr, checkboxRowLayout, checkboxContentLayout);
+    if (!vsyncCheckbox)
+        return false;
+
+    m_CheckboxChangedConnections[0] = vsyncCheckbox->OnCheckedChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: VSync checkbox "
+                      << (event.newValue ? "checked" : "unchecked") << ".\n";
+        });
+
+    CheckboxWidget* hdrCheckbox = AddCheckbox(
+        *checkboxList, "Enable HDR", nullptr, checkboxRowLayout, checkboxContentLayout);
+    if (!hdrCheckbox)
+        return false;
+
+    hdrCheckbox->SetChecked(true);
+    m_CheckboxChangedConnections[1] = hdrCheckbox->OnCheckedChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: HDR checkbox "
+                      << (event.newValue ? "checked" : "unchecked") << ".\n";
+        });
+
+    CheckboxWidget* disabledCheckbox = AddCheckbox(
+        *checkboxList, "Read-only setting", nullptr, checkboxRowLayout, checkboxContentLayout);
+    if (!disabledCheckbox)
+        return false;
+
+    disabledCheckbox->SetChecked(true);
+    disabledCheckbox->SetEnabled(false);
+
+    // Radio button group.
+    FWidgetLayout radioButtonListLayout;
+    radioButtonListLayout.width = FLayoutLength::Units(260.0f);
+    radioButtonListLayout.height = FLayoutLength::Auto();
+
+    ContainerWidget* radioButtonList = AddContainer(
+        *m_ButtonPlayground,
+        nullptr,
+        radioButtonListLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Vertical,
+            8.0f,
+            EAlignment::Start,
+            EJustification::Start));
+
+    if (!radioButtonList ||
+        !AddText(*radioButtonList, "RADIO BUTTONS", "PanelTitle") ||
+        !AddText(*radioButtonList, "Mutually exclusive rendering backend selection.", "Body"))
+    {
+        return false;
+    }
+
+    FWidgetLayout radioButtonRowLayout;
+    radioButtonRowLayout.width = FLayoutLength::Percent(100.0f);
+    radioButtonRowLayout.height = FLayoutLength::Units(26.0f);
+
+    const FContainerLayout radioButtonContentLayout = MakeContainerLayout(
+        ELayoutDirection::Horizontal,
+        0.0f,
+        EAlignment::Center,
+        EJustification::Start);
+
+    constexpr char kRenderingBackendGroup[] = "RenderingBackend";
+
+    RadioButtonWidget* openGLRadioButton = AddRadioButton(
+        *radioButtonList, "OpenGL", kRenderingBackendGroup,
+        radioButtonRowLayout, radioButtonContentLayout);
+    RadioButtonWidget* vulkanRadioButton = AddRadioButton(
+        *radioButtonList, "Vulkan", kRenderingBackendGroup,
+        radioButtonRowLayout, radioButtonContentLayout);
+    RadioButtonWidget* metalRadioButton = AddRadioButton(
+        *radioButtonList, "Metal", kRenderingBackendGroup,
+        radioButtonRowLayout, radioButtonContentLayout);
+    RadioButtonWidget* directXRadioButton = AddRadioButton(
+        *radioButtonList, "DirectX 12 (unavailable)", kRenderingBackendGroup,
+        radioButtonRowLayout, radioButtonContentLayout);
+
+    if (!openGLRadioButton || !vulkanRadioButton ||
+        !metalRadioButton || !directXRadioButton)
+    {
+        return false;
+    }
+
+    vulkanRadioButton->SetSelected(true);
+    directXRadioButton->SetEnabled(false);
+
+    m_RadioButtonChangedConnections[0] = openGLRadioButton->OnSelectedChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: OpenGL radio button "
+                      << (event.newValue ? "selected" : "deselected") << ".\n";
+        });
+
+    m_RadioButtonChangedConnections[1] = vulkanRadioButton->OnSelectedChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: Vulkan radio button "
+                      << (event.newValue ? "selected" : "deselected") << ".\n";
+        });
+
+    m_RadioButtonChangedConnections[2] = metalRadioButton->OnSelectedChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: Metal radio button "
+                      << (event.newValue ? "selected" : "deselected") << ".\n";
+        });
+
+    m_RadioButtonChangedConnections[3] = directXRadioButton->OnSelectedChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: DirectX 12 radio button "
+                      << (event.newValue ? "selected" : "deselected") << ".\n";
+        });
+
+    // Toggles.
+    FWidgetLayout toggleListLayout;
+    toggleListLayout.width = FLayoutLength::Units(280.0f);
+    toggleListLayout.height = FLayoutLength::Auto();
+
+    ContainerWidget* toggleList = AddContainer(
+        *m_ButtonPlayground,
+        nullptr,
+        toggleListLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Vertical,
+            8.0f,
+            EAlignment::Start,
+            EJustification::Start));
+
+    if (!toggleList ||
+        !AddText(*toggleList, "TOGGLES", "PanelTitle") ||
+        !AddText(*toggleList, "Independent on/off controls with theme-controlled thumbs.", "Body"))
+    {
+        return false;
+    }
+
+    FWidgetLayout toggleRowLayout;
+    toggleRowLayout.width = FLayoutLength::Percent(100.0f);
+    toggleRowLayout.height = FLayoutLength::Units(28.0f);
+
+    ToggleWidget* temporalUpscalingToggle = AddToggle(
+        *toggleList, "Temporal Upscaling", "Default", toggleRowLayout);
+    ToggleWidget* dynamicResolutionToggle = AddToggle(
+        *toggleList, "Dynamic Resolution", "Default", toggleRowLayout);
+    ToggleWidget* rayTracingToggle = AddToggle(
+        *toggleList, "Ray Tracing", "Default", toggleRowLayout);
+    ToggleWidget* disabledToggle = AddToggle(
+        *toggleList, "Read-only feature", "Default", toggleRowLayout);
+
+    if (!temporalUpscalingToggle || !dynamicResolutionToggle ||
+        !rayTracingToggle || !disabledToggle)
+    {
+        return false;
+    }
+
+    temporalUpscalingToggle->SetOn(true);
+    rayTracingToggle->SetOn(true);
+    disabledToggle->SetOn(true);
+    disabledToggle->SetEnabled(false);
+
+    m_ToggleChangedConnections[0] = temporalUpscalingToggle->OnToggledChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: Temporal Upscaling "
+                      << (event.newValue ? "enabled" : "disabled") << ".\n";
+        });
+
+    m_ToggleChangedConnections[1] = dynamicResolutionToggle->OnToggledChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: Dynamic Resolution "
+                      << (event.newValue ? "enabled" : "disabled") << ".\n";
+        });
+
+    m_ToggleChangedConnections[2] = rayTracingToggle->OnToggledChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: Ray Tracing "
+                      << (event.newValue ? "enabled" : "disabled") << ".\n";
+        });
+
+    m_ToggleChangedConnections[3] = disabledToggle->OnToggledChanged().Connect(
+        [](TValueChangedEvent<bool>& event)
+        {
+            std::cout << "[SilverwarePlayground]: Read-only feature "
+                      << (event.newValue ? "enabled" : "disabled") << ".\n";
+        });
+
+    // Slider examples.
     FWidgetLayout sliderListLayout;
     sliderListLayout.width = FLayoutLength::Units(340.0f);
     sliderListLayout.height = FLayoutLength::Auto();
@@ -1737,445 +1737,417 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
             10.0f,
             EAlignment::Start,
             EJustification::Start));
-    //
-    // if (!sliderList ||
-    //     !AddText(*sliderList, "SLIDERS", "PanelTitle") ||
-    //     !AddText(*sliderList, "Pointer drag, keyboard adjustment, snapping and orientation.", "Body"))
-    // {
-    //     return false;
-    // }
-    //
-    // const auto addHorizontalSliderSample = [this, sliderList](
-    //     const char* label,
-    //     double minimum,
-    //     double maximum,
-    //     double step,
-    //     double initialValue,
-    //     int precision,
-    //     const char* suffix,
-    //     std::size_t connectionIndex) -> bool
-    // {
-    //     FWidgetLayout sampleLayout;
-    //     sampleLayout.width = FLayoutLength::Percent(100.0f);
-    //     sampleLayout.height = FLayoutLength::Auto();
-    //
-    //     ContainerWidget* sample = AddContainer(
-    //         *sliderList,
-    //         nullptr,
-    //         sampleLayout,
-    //         MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
-    //
-    //     if (!sample)
-    //         return false;
-    //
-    //     FWidgetLayout headerLayout;
-    //     headerLayout.width = FLayoutLength::Percent(100.0f);
-    //     headerLayout.height = FLayoutLength::Auto();
-    //
-    //     ContainerWidget* header = AddContainer(
-    //         *sample,
-    //         nullptr,
-    //         headerLayout,
-    //         MakeContainerLayout(
-    //             ELayoutDirection::Horizontal,
-    //             8.0f,
-    //             EAlignment::Center,
-    //             EJustification::Start));
-    //
-    //     if (!header || !AddText(*header, label, "Body"))
-    //         return false;
-    //
-    //     TextWidget* valueLabel = AddText(
-    //         *header,
-    //         FormatSliderValue(initialValue, precision, suffix),
-    //         "Mono");
-    //
-    //     if (!valueLabel)
-    //         return false;
-    //
-    //     FWidgetLayout sliderLayout;
-    //     sliderLayout.width = FLayoutLength::Units(280.0f);
-    //     sliderLayout.height = FLayoutLength::Units(24.0f);
-    //
-    //     SliderWidget* slider = AddSlider(
-    //         *sample,
-    //         "Default",
-    //         sliderLayout,
-    //         minimum,
-    //         maximum,
-    //         step,
-    //         initialValue);
-    //
-    //     if (!slider)
-    //         return false;
-    //
-    //     const std::string sampleName(label);
-    //     const std::string valueSuffix(suffix ? suffix : "");
-    //
-    //     m_SliderValueChangedConnections[connectionIndex] = slider->OnValueChanged().Connect(
-    //         [valueLabel, precision, valueSuffix](TValueChangedEvent<double>& event)
-    //         {
-    //             valueLabel->SetText(FormatSliderValue(
-    //                 event.newValue,
-    //                 precision,
-    //                 valueSuffix.c_str()));
-    //         });
-    //
-    //     m_SliderValueCommittedConnections[connectionIndex] = slider->OnValueChangeCommitted().Connect(
-    //         [sampleName, precision, valueSuffix](TValueChangeCommittedEvent<double>& event)
-    //         {
-    //             std::cout << "[SilverwarePlayground]: " << sampleName
-    //                       << " committed "
-    //                       << FormatSliderValue(event.oldValue, precision, valueSuffix.c_str())
-    //                       << " -> "
-    //                       << FormatSliderValue(event.newValue, precision, valueSuffix.c_str())
-    //                       << ".\n";
-    //         });
-    //
-    //     return true;
-    // };
-    //
-    // if (!addHorizontalSliderSample(
-    //         "Master Volume", 0.0, 100.0, 1.0, 68.0, 0, "%", 0) ||
-    //     !addHorizontalSliderSample(
-    //         "Render Scale", 50.0, 150.0, 5.0, 100.0, 0, "%", 1))
-    // {
-    //     return false;
-    // }
-    //
-    // // Vertical slider: the value should increase as the thumb moves upward.
-    // FWidgetLayout verticalSampleLayout;
-    // verticalSampleLayout.width = FLayoutLength::Percent(100.0f);
-    // verticalSampleLayout.height = FLayoutLength::Auto();
-    //
-    // ContainerWidget* verticalSample = AddContainer(
-    //     *sliderList,
-    //     nullptr,
-    //     verticalSampleLayout,
-    //     MakeContainerLayout(
-    //         ELayoutDirection::Horizontal,
-    //         12.0f,
-    //         EAlignment::Center,
-    //         EJustification::Start));
-    //
-    // if (!verticalSample)
-    //     return false;
-    //
-    // FWidgetLayout exposureInfoLayout;
-    // exposureInfoLayout.width = FLayoutLength::Units(0.0f);
-    // exposureInfoLayout.height = FLayoutLength::Auto();
-    // exposureInfoLayout.flexGrow = 1.0f;
-    //
-    // ContainerWidget* exposureInfo = AddContainer(
-    //     *verticalSample,
-    //     nullptr,
-    //     exposureInfoLayout,
-    //     MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
-    //
-    // if (!exposureInfo ||
-    //     !AddText(*exposureInfo, "VERTICAL SLIDER", "Kicker"))
-    // {
-    //     return false;
-    // }
-    //
-    // TextWidget* exposureValueLabel = AddText(*exposureInfo, "0.0 EV", "Mono");
-    //
-    // if (!exposureValueLabel ||
-    //     !AddText(*exposureInfo, "Move upward to increase exposure.", "Body"))
-    // {
-    //     return false;
-    // }
-    //
-    // FWidgetLayout verticalSliderLayout;
-    // verticalSliderLayout.width = FLayoutLength::Units(24.0f);
-    // verticalSliderLayout.height = FLayoutLength::Units(160.0f);
-    //
-    // SliderWidget* exposureSlider = AddSlider(
-    //     *verticalSample,
-    //     "Vertical",
-    //     verticalSliderLayout,
-    //     -2.0,
-    //     2.0,
-    //     0.1,
-    //     0.0,
-    //     ESliderOrientation::Vertical);
-    //
-    // if (!exposureSlider)
-    //     return false;
-    //
-    // m_SliderValueChangedConnections[2] = exposureSlider->OnValueChanged().Connect(
-    //     [exposureValueLabel](TValueChangedEvent<double>& event)
-    //     {
-    //         exposureValueLabel->SetText(FormatSliderValue(event.newValue, 1, " EV"));
-    //     });
-    //
-    // m_SliderValueCommittedConnections[2] = exposureSlider->OnValueChangeCommitted().Connect(
-    //     [](TValueChangeCommittedEvent<double>& event)
-    //     {
-    //         std::cout << "[SilverwarePlayground]: Exposure committed "
-    //                   << FormatSliderValue(event.oldValue, 1, " EV")
-    //                   << " -> "
-    //                   << FormatSliderValue(event.newValue, 1, " EV")
-    //                   << ".\n";
-    //     });
-    //
-    // // Disabled-state sample. It should remain visible but ignore pointer and keyboard input.
-    // FWidgetLayout disabledSliderSampleLayout;
-    // disabledSliderSampleLayout.width = FLayoutLength::Percent(100.0f);
-    // disabledSliderSampleLayout.height = FLayoutLength::Auto();
-    //
-    // ContainerWidget* disabledSliderSample = AddContainer(
-    //     *sliderList,
-    //     nullptr,
-    //     disabledSliderSampleLayout,
-    //     MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
-    //
-    // if (!disabledSliderSample)
-    //     return false;
-    //
-    // FWidgetLayout disabledHeaderLayout;
-    // disabledHeaderLayout.width = FLayoutLength::Percent(100.0f);
-    // disabledHeaderLayout.height = FLayoutLength::Auto();
-    //
-    // ContainerWidget* disabledHeader = AddContainer(
-    //     *disabledSliderSample,
-    //     nullptr,
-    //     disabledHeaderLayout,
-    //     MakeContainerLayout(
-    //         ELayoutDirection::Horizontal,
-    //         8.0f,
-    //         EAlignment::Center,
-    //         EJustification::Start));
-    //
-    // if (!disabledHeader || !AddText(*disabledHeader, "Read-only preview", "Body") ||
-    //     !AddText(*disabledHeader, "75%", "Mono"))
-    // {
-    //     return false;
-    // }
-    //
-    // FWidgetLayout disabledSliderLayout;
-    // disabledSliderLayout.width = FLayoutLength::Units(280.0f);
-    // disabledSliderLayout.height = FLayoutLength::Units(24.0f);
-    //
-    // SliderWidget* disabledSlider = AddSlider(
-    //     *disabledSliderSample,
-    //     "Default",
-    //     disabledSliderLayout,
-    //     0.0,
-    //     100.0,
-    //     5.0,
-    //     75.0);
-    //
-    // if (!disabledSlider)
-    //     return false;
-    //
-    // disabledSlider->SetEnabled(false);
 
-    // // Ranged slider examples: endpoint thumbs move independently, while the
-    // // selected handle translates the complete interval without changing width.
-    // if (!AddText(*sliderList, "RANGED SLIDERS", "PanelTitle") ||
-    //     !AddText(*sliderList,
-    //         "Drag either thumb to edit one endpoint. Drag the filled handle to move the whole range.",
-    //         "Body"))
-    // {
-    //     return false;
-    // }
-    //
-    // const auto addHorizontalRangedSliderSample = [this, sliderList](
-    //     const char* label,
-    //     double minimum,
-    //     double maximum,
-    //     double step,
-    //     double initialLow,
-    //     double initialHigh,
-    //     int precision,
-    //     const char* suffix,
-    //     std::size_t connectionIndex) -> bool
-    // {
-    //     FWidgetLayout sampleLayout;
-    //     sampleLayout.width = FLayoutLength::Percent(100.0f);
-    //     sampleLayout.height = FLayoutLength::Auto();
-    //
-    //     ContainerWidget* sample = AddContainer(
-    //         *sliderList,
-    //         nullptr,
-    //         sampleLayout,
-    //         MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
-    //
-    //     if (!sample)
-    //         return false;
-    //
-    //     FWidgetLayout headerLayout;
-    //     headerLayout.width = FLayoutLength::Percent(100.0f);
-    //     headerLayout.height = FLayoutLength::Auto();
-    //
-    //     ContainerWidget* header = AddContainer(
-    //         *sample,
-    //         nullptr,
-    //         headerLayout,
-    //         MakeContainerLayout(
-    //             ELayoutDirection::Horizontal,
-    //             8.0f,
-    //             EAlignment::Center,
-    //             EJustification::SpaceBetween));
-    //
-    //     if (!header || !AddText(*header, label, "Body"))
-    //         return false;
-    //
-    //     TextWidget* valueLabel = AddText(
-    //         *header,
-    //         FormatRangedSliderValues({initialLow, initialHigh}, precision, suffix),
-    //         "Mono");
-    //
-    //     if (!valueLabel)
-    //         return false;
-    //
-    //     FWidgetLayout sliderLayout;
-    //     sliderLayout.width = FLayoutLength::Units(280.0f);
-    //     sliderLayout.height = FLayoutLength::Units(24.0f);
-    //
-    //     RangedSliderWidget* slider = AddRangedSlider(
-    //         *sample,
-    //         "Default",
-    //         sliderLayout,
-    //         minimum,
-    //         maximum,
-    //         step,
-    //         initialLow,
-    //         initialHigh);
-    //
-    //     if (!slider)
-    //         return false;
-    //
-    //     const std::string sampleName(label);
-    //     const std::string valueSuffix(suffix ? suffix : "");
-    //
-    //     m_RangedSliderValuesChangedConnections[connectionIndex] =
-    //         slider->OnRangeChanged().Connect(
-    //             [valueLabel, precision, valueSuffix](TValueChangedEvent<FRangedSliderValues>& event)
-    //             {
-    //                 valueLabel->SetText(FormatRangedSliderValues(
-    //                     event.newValue,
-    //                     precision,
-    //                     valueSuffix.c_str()));
-    //             });
-    //
-    //     m_RangedSliderValuesCommittedConnections[connectionIndex] =
-    //         slider->OnRangeChangeCommitted().Connect(
-    //             [sampleName, precision, valueSuffix](
-    //                 TValueChangeCommittedEvent<FRangedSliderValues>& event)
-    //             {
-    //                 std::cout << "[SilverwarePlayground]: " << sampleName
-    //                           << " committed ["
-    //                           << FormatRangedSliderValues(event.oldValue, precision, valueSuffix.c_str())
-    //                           << "] -> ["
-    //                           << FormatRangedSliderValues(event.newValue, precision, valueSuffix.c_str())
-    //                           << "].\n";
-    //             });
-    //
-    //     return true;
-    // };
-    //
-    // if (!addHorizontalRangedSliderSample(
-    //         "Playback Loop", 0.0, 100.0, 1.0, 20.0, 80.0, 0, "%", 0) ||
-    //     !addHorizontalRangedSliderSample(
-    //         "Temperature Window", -20.0, 50.0, 0.5, 4.0, 28.0, 1, " °C", 1))
-    // {
-    //     return false;
-    // }
-    //
-    // // Vertical ranged slider: moving the selected handle translates both
-    // // endpoints while preserving their distance, and upward increases values.
-    // FWidgetLayout verticalRangeSampleLayout;
-    // verticalRangeSampleLayout.width = FLayoutLength::Percent(100.0f);
-    // verticalRangeSampleLayout.height = FLayoutLength::Auto();
-    //
-    // ContainerWidget* verticalRangeSample = AddContainer(
-    //     *sliderList,
-    //     nullptr,
-    //     verticalRangeSampleLayout,
-    //     MakeContainerLayout(
-    //         ELayoutDirection::Horizontal,
-    //         12.0f,
-    //         EAlignment::Center,
-    //         EJustification::Start));
-    //
-    // if (!verticalRangeSample)
-    //     return false;
-    //
-    // FWidgetLayout verticalRangeInfoLayout;
-    // verticalRangeInfoLayout.width = FLayoutLength::Units(0.0f);
-    // verticalRangeInfoLayout.height = FLayoutLength::Auto();
-    // verticalRangeInfoLayout.flexGrow = 1.0f;
-    //
-    // ContainerWidget* verticalRangeInfo = AddContainer(
-    //     *verticalRangeSample,
-    //     nullptr,
-    //     verticalRangeInfoLayout,
-    //     MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
-    //
-    // if (!verticalRangeInfo ||
-    //     !AddText(*verticalRangeInfo, "VERTICAL RANGE", "Kicker"))
-    // {
-    //     return false;
-    // }
-    //
-    // TextWidget* verticalRangeValueLabel = AddText(
-    //     *verticalRangeInfo,
-    //     FormatRangedSliderValues({-4.0, 6.0}, 1, " dB"),
-    //     "Mono");
-    //
-    // if (!verticalRangeValueLabel ||
-    //     !AddText(*verticalRangeInfo,
-    //         "Drag either endpoint or move the selected range upward.",
-    //         "Body"))
-    // {
-    //     return false;
-    // }
-    //
-    // FWidgetLayout verticalRangeSliderLayout;
-    // verticalRangeSliderLayout.width = FLayoutLength::Units(24.0f);
-    // verticalRangeSliderLayout.height = FLayoutLength::Units(160.0f);
-    //
-    // RangedSliderWidget* verticalRangeSlider = AddRangedSlider(
-    //     *verticalRangeSample,
-    //     "Vertical",
-    //     verticalRangeSliderLayout,
-    //     -10.0,
-    //     10.0,
-    //     0.5,
-    //     -4.0,
-    //     6.0,
-    //     ESliderOrientation::Vertical);
-    //
-    // if (!verticalRangeSlider)
-    //     return false;
-    //
-    // m_RangedSliderValuesChangedConnections[2] =
-    //     verticalRangeSlider->OnRangeChanged().Connect(
-    //         [verticalRangeValueLabel](TValueChangedEvent<FRangedSliderValues>& event)
-    //         {
-    //             verticalRangeValueLabel->SetText(FormatRangedSliderValues(event.newValue, 1, " dB"));
-    //         });
-    //
-    // m_RangedSliderValuesCommittedConnections[2] =
-    //     verticalRangeSlider->OnRangeChangeCommitted().Connect(
-    //         [](TValueChangeCommittedEvent<FRangedSliderValues>& event)
-    //         {
-    //             std::cout << "[SilverwarePlayground]: Vertical range committed ["
-    //                       << FormatRangedSliderValues(event.oldValue, 1, " dB")
-    //                       << "] -> ["
-    //                       << FormatRangedSliderValues(event.newValue, 1, " dB")
-    //                       << "].\n";
-    //         });
+    if (!sliderList ||
+        !AddText(*sliderList, "SLIDERS", "PanelTitle") ||
+        !AddText(*sliderList, "Pointer drag, keyboard adjustment, snapping and orientation.", "Body"))
+    {
+        return false;
+    }
 
-        // Progress bar examples.
+    const auto addHorizontalSliderSample = [this, sliderList](
+        const char* label,
+        double minimum,
+        double maximum,
+        double step,
+        double initialValue,
+        int precision,
+        const char* suffix,
+        std::size_t connectionIndex) -> bool
+    {
+        FWidgetLayout sampleLayout;
+        sampleLayout.width = FLayoutLength::Percent(100.0f);
+        sampleLayout.height = FLayoutLength::Auto();
+
+        ContainerWidget* sample = AddContainer(
+            *sliderList,
+            nullptr,
+            sampleLayout,
+            MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
+        if (!sample)
+            return false;
+
+        FWidgetLayout headerLayout;
+        headerLayout.width = FLayoutLength::Percent(100.0f);
+        headerLayout.height = FLayoutLength::Auto();
+
+        ContainerWidget* header = AddContainer(
+            *sample,
+            nullptr,
+            headerLayout,
+            MakeContainerLayout(
+                ELayoutDirection::Horizontal,
+                8.0f,
+                EAlignment::Center,
+                EJustification::SpaceBetween));
+
+        if (!header || !AddText(*header, label, "Body"))
+            return false;
+
+        TextWidget* valueLabel = AddText(
+            *header,
+            FormatSliderValue(initialValue, precision, suffix),
+            "Mono");
+        if (!valueLabel)
+            return false;
+
+        FWidgetLayout sliderLayout;
+        sliderLayout.width = FLayoutLength::Units(280.0f);
+        sliderLayout.height = FLayoutLength::Units(24.0f);
+
+        SliderWidget* slider = AddSlider(
+            *sample,
+            "Default",
+            sliderLayout,
+            minimum,
+            maximum,
+            step,
+            initialValue);
+        if (!slider)
+            return false;
+
+        const std::string sampleName(label);
+        const std::string valueSuffix(suffix ? suffix : "");
+
+        m_SliderValueChangedConnections[connectionIndex] = slider->OnValueChanged().Connect(
+            [valueLabel, precision, valueSuffix](TValueChangedEvent<double>& event)
+            {
+                valueLabel->SetText(FormatSliderValue(
+                    event.newValue, precision, valueSuffix.c_str()));
+            });
+
+        m_SliderValueCommittedConnections[connectionIndex] = slider->OnValueChangeCommitted().Connect(
+            [sampleName, precision, valueSuffix](TValueChangeCommittedEvent<double>& event)
+            {
+                std::cout << "[SilverwarePlayground]: " << sampleName << " committed "
+                          << FormatSliderValue(event.oldValue, precision, valueSuffix.c_str())
+                          << " -> "
+                          << FormatSliderValue(event.newValue, precision, valueSuffix.c_str())
+                          << ".\n";
+            });
+
+        return true;
+    };
+
+    if (!addHorizontalSliderSample("Master Volume", 0.0, 100.0, 1.0, 68.0, 0, "%", 0) ||
+        !addHorizontalSliderSample("Render Scale", 50.0, 150.0, 5.0, 100.0, 0, "%", 1))
+    {
+        return false;
+    }
+
+    // Vertical slider.
+    FWidgetLayout verticalSampleLayout;
+    verticalSampleLayout.width = FLayoutLength::Percent(100.0f);
+    verticalSampleLayout.height = FLayoutLength::Auto();
+
+    ContainerWidget* verticalSample = AddContainer(
+        *sliderList,
+        nullptr,
+        verticalSampleLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Horizontal,
+            12.0f,
+            EAlignment::Center,
+            EJustification::Start));
+    if (!verticalSample)
+        return false;
+
+    FWidgetLayout exposureInfoLayout;
+    exposureInfoLayout.width = FLayoutLength::Units(0.0f);
+    exposureInfoLayout.height = FLayoutLength::Auto();
+    exposureInfoLayout.flexGrow = 1.0f;
+
+    ContainerWidget* exposureInfo = AddContainer(
+        *verticalSample,
+        nullptr,
+        exposureInfoLayout,
+        MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
+
+    if (!exposureInfo || !AddText(*exposureInfo, "VERTICAL SLIDER", "Kicker"))
+        return false;
+
+    TextWidget* exposureValueLabel = AddText(*exposureInfo, "0.0 EV", "Mono");
+    if (!exposureValueLabel ||
+        !AddText(*exposureInfo, "Move upward to increase exposure.", "Body"))
+    {
+        return false;
+    }
+
+    FWidgetLayout verticalSliderLayout;
+    verticalSliderLayout.width = FLayoutLength::Units(24.0f);
+    verticalSliderLayout.height = FLayoutLength::Units(160.0f);
+
+    SliderWidget* exposureSlider = AddSlider(
+        *verticalSample,
+        "Vertical",
+        verticalSliderLayout,
+        -2.0,
+        2.0,
+        0.1,
+        0.0,
+        ESliderOrientation::Vertical);
+    if (!exposureSlider)
+        return false;
+
+    m_SliderValueChangedConnections[2] = exposureSlider->OnValueChanged().Connect(
+        [exposureValueLabel](TValueChangedEvent<double>& event)
+        {
+            exposureValueLabel->SetText(FormatSliderValue(event.newValue, 1, " EV"));
+        });
+
+    m_SliderValueCommittedConnections[2] = exposureSlider->OnValueChangeCommitted().Connect(
+        [](TValueChangeCommittedEvent<double>& event)
+        {
+            std::cout << "[SilverwarePlayground]: Exposure committed "
+                      << FormatSliderValue(event.oldValue, 1, " EV")
+                      << " -> "
+                      << FormatSliderValue(event.newValue, 1, " EV")
+                      << ".\n";
+        });
+
+    // Disabled slider.
+    FWidgetLayout disabledSliderSampleLayout;
+    disabledSliderSampleLayout.width = FLayoutLength::Percent(100.0f);
+    disabledSliderSampleLayout.height = FLayoutLength::Auto();
+
+    ContainerWidget* disabledSliderSample = AddContainer(
+        *sliderList,
+        nullptr,
+        disabledSliderSampleLayout,
+        MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
+    if (!disabledSliderSample)
+        return false;
+
+    FWidgetLayout disabledHeaderLayout;
+    disabledHeaderLayout.width = FLayoutLength::Percent(100.0f);
+    disabledHeaderLayout.height = FLayoutLength::Auto();
+
+    ContainerWidget* disabledHeader = AddContainer(
+        *disabledSliderSample,
+        nullptr,
+        disabledHeaderLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Horizontal,
+            8.0f,
+            EAlignment::Center,
+            EJustification::SpaceBetween));
+
+    if (!disabledHeader ||
+        !AddText(*disabledHeader, "Read-only preview", "Body") ||
+        !AddText(*disabledHeader, "75%", "Mono"))
+    {
+        return false;
+    }
+
+    FWidgetLayout disabledSliderLayout;
+    disabledSliderLayout.width = FLayoutLength::Units(280.0f);
+    disabledSliderLayout.height = FLayoutLength::Units(24.0f);
+
+    SliderWidget* disabledSlider = AddSlider(
+        *disabledSliderSample,
+        "Default",
+        disabledSliderLayout,
+        0.0,
+        100.0,
+        5.0,
+        75.0);
+    if (!disabledSlider)
+        return false;
+
+    disabledSlider->SetEnabled(false);
+
+    // Ranged slider examples.
+    if (!AddText(*sliderList, "RANGED SLIDERS", "PanelTitle") ||
+        !AddText(*sliderList,
+            "Drag either thumb to edit one endpoint. Drag the filled handle to move the whole range.",
+            "Body"))
+    {
+        return false;
+    }
+
+    const auto addHorizontalRangedSliderSample = [this, sliderList](
+        const char* label,
+        double minimum,
+        double maximum,
+        double step,
+        double initialLow,
+        double initialHigh,
+        int precision,
+        const char* suffix,
+        std::size_t connectionIndex) -> bool
+    {
+        FWidgetLayout sampleLayout;
+        sampleLayout.width = FLayoutLength::Percent(100.0f);
+        sampleLayout.height = FLayoutLength::Auto();
+
+        ContainerWidget* sample = AddContainer(
+            *sliderList,
+            nullptr,
+            sampleLayout,
+            MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
+        if (!sample)
+            return false;
+
+        FWidgetLayout headerLayout;
+        headerLayout.width = FLayoutLength::Percent(100.0f);
+        headerLayout.height = FLayoutLength::Auto();
+
+        ContainerWidget* header = AddContainer(
+            *sample,
+            nullptr,
+            headerLayout,
+            MakeContainerLayout(
+                ELayoutDirection::Horizontal,
+                8.0f,
+                EAlignment::Center,
+                EJustification::SpaceBetween));
+
+        if (!header || !AddText(*header, label, "Body"))
+            return false;
+
+        TextWidget* valueLabel = AddText(
+            *header,
+            FormatRangedSliderValues({initialLow, initialHigh}, precision, suffix),
+            "Mono");
+        if (!valueLabel)
+            return false;
+
+        FWidgetLayout sliderLayout;
+        sliderLayout.width = FLayoutLength::Units(280.0f);
+        sliderLayout.height = FLayoutLength::Units(24.0f);
+
+        RangedSliderWidget* slider = AddRangedSlider(
+            *sample,
+            "Default",
+            sliderLayout,
+            minimum,
+            maximum,
+            step,
+            initialLow,
+            initialHigh);
+        if (!slider)
+            return false;
+
+        const std::string sampleName(label);
+        const std::string valueSuffix(suffix ? suffix : "");
+
+        m_RangedSliderValuesChangedConnections[connectionIndex] =
+            slider->OnRangeChanged().Connect(
+                [valueLabel, precision, valueSuffix](TValueChangedEvent<FRangedSliderValues>& event)
+                {
+                    valueLabel->SetText(FormatRangedSliderValues(
+                        event.newValue, precision, valueSuffix.c_str()));
+                });
+
+        m_RangedSliderValuesCommittedConnections[connectionIndex] =
+            slider->OnRangeChangeCommitted().Connect(
+                [sampleName, precision, valueSuffix](TValueChangeCommittedEvent<FRangedSliderValues>& event)
+                {
+                    std::cout << "[SilverwarePlayground]: " << sampleName << " committed ["
+                              << FormatRangedSliderValues(event.oldValue, precision, valueSuffix.c_str())
+                              << "] -> ["
+                              << FormatRangedSliderValues(event.newValue, precision, valueSuffix.c_str())
+                              << "].\n";
+                });
+
+        return true;
+    };
+
+    if (!addHorizontalRangedSliderSample(
+            "Playback Loop", 0.0, 100.0, 1.0, 20.0, 80.0, 0, "%", 0) ||
+        !addHorizontalRangedSliderSample(
+            "Temperature Window", -20.0, 50.0, 0.5, 4.0, 28.0, 1, " °C", 1))
+    {
+        return false;
+    }
+
+    // Vertical ranged slider.
+    FWidgetLayout verticalRangeSampleLayout;
+    verticalRangeSampleLayout.width = FLayoutLength::Percent(100.0f);
+    verticalRangeSampleLayout.height = FLayoutLength::Auto();
+
+    ContainerWidget* verticalRangeSample = AddContainer(
+        *sliderList,
+        nullptr,
+        verticalRangeSampleLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Horizontal,
+            12.0f,
+            EAlignment::Center,
+            EJustification::Start));
+    if (!verticalRangeSample)
+        return false;
+
+    FWidgetLayout verticalRangeInfoLayout;
+    verticalRangeInfoLayout.width = FLayoutLength::Units(0.0f);
+    verticalRangeInfoLayout.height = FLayoutLength::Auto();
+    verticalRangeInfoLayout.flexGrow = 1.0f;
+
+    ContainerWidget* verticalRangeInfo = AddContainer(
+        *verticalRangeSample,
+        nullptr,
+        verticalRangeInfoLayout,
+        MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
+
+    if (!verticalRangeInfo || !AddText(*verticalRangeInfo, "VERTICAL RANGE", "Kicker"))
+        return false;
+
+    TextWidget* verticalRangeValueLabel = AddText(
+        *verticalRangeInfo,
+        FormatRangedSliderValues({-4.0, 6.0}, 1, " dB"),
+        "Mono");
+
+    if (!verticalRangeValueLabel ||
+        !AddText(*verticalRangeInfo,
+            "Drag either endpoint or move the selected range upward.",
+            "Body"))
+    {
+        return false;
+    }
+
+    FWidgetLayout verticalRangeSliderLayout;
+    verticalRangeSliderLayout.width = FLayoutLength::Units(24.0f);
+    verticalRangeSliderLayout.height = FLayoutLength::Units(160.0f);
+
+    RangedSliderWidget* verticalRangeSlider = AddRangedSlider(
+        *verticalRangeSample,
+        "Vertical",
+        verticalRangeSliderLayout,
+        -10.0,
+        10.0,
+        0.5,
+        -4.0,
+        6.0,
+        ESliderOrientation::Vertical);
+    if (!verticalRangeSlider)
+        return false;
+
+    m_RangedSliderValuesChangedConnections[2] =
+        verticalRangeSlider->OnRangeChanged().Connect(
+            [verticalRangeValueLabel](TValueChangedEvent<FRangedSliderValues>& event)
+            {
+                verticalRangeValueLabel->SetText(
+                    FormatRangedSliderValues(event.newValue, 1, " dB"));
+            });
+
+    m_RangedSliderValuesCommittedConnections[2] =
+        verticalRangeSlider->OnRangeChangeCommitted().Connect(
+            [](TValueChangeCommittedEvent<FRangedSliderValues>& event)
+            {
+                std::cout << "[SilverwarePlayground]: Vertical range committed ["
+                          << FormatRangedSliderValues(event.oldValue, 1, " dB")
+                          << "] -> ["
+                          << FormatRangedSliderValues(event.newValue, 1, " dB")
+                          << "].\n";
+            });
+
+    // Progress bars.
     FWidgetLayout progressBarPlaygroundLayout;
     progressBarPlaygroundLayout.width = FLayoutLength::Percent(100.0f);
     progressBarPlaygroundLayout.height = FLayoutLength::Auto();
 
     m_ProgressBarPlayground = AddContainer(
-        *sliderList,
+        *m_ButtonPlayground,
         nullptr,
         progressBarPlaygroundLayout,
         MakeContainerLayout(
@@ -2193,7 +2165,6 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         return false;
     }
 
-    // Static progress states.
     const auto addProgressStateSample = [this](
         const char* label,
         const char* valueText,
@@ -2211,22 +2182,24 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
             nullptr,
             sampleLayout,
             MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
-
         if (!sample)
             return false;
+
+        FWidgetLayout headerLayout;
+        headerLayout.width = FLayoutLength::Percent(100.0f);
+        headerLayout.height = FLayoutLength::Auto();
 
         ContainerWidget* header = AddContainer(
             *sample,
             nullptr,
-            FWidgetLayout{},
+            headerLayout,
             MakeContainerLayout(
                 ELayoutDirection::Horizontal,
                 8.0f,
-                EAlignment::Center,
-                EJustification::SpaceBetween));
+                EAlignment::Start,
+                EJustification::Start));
 
-        if (!header ||
-            !AddText(*header, label, "Body") ||
+        if (!header || !AddText(*header, label, "Body") ||
             !AddText(*header, valueText, "Mono"))
         {
             return false;
@@ -2243,24 +2216,24 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
             minimum,
             maximum,
             value);
-
         if (!progressBar)
             return false;
 
         progressBar->SetEnabled(bEnabled);
-
         return true;
     };
 
     if (!addProgressStateSample("Empty", "0%", 0.0, 100.0, 0.0, true) ||
+        !addProgressStateSample("Quarter", "25%", 0.0, 100.0, 25.0, true) ||
+        !addProgressStateSample("Half", "50%", 0.0, 100.0, 50.0, true) ||
         !addProgressStateSample("Almost complete", "75%", 0.0, 100.0, 75.0, true) ||
+        !addProgressStateSample("Complete", "100%", 0.0, 100.0, 100.0, true) ||
         !addProgressStateSample("Custom range", "325 / 500", 0.0, 500.0, 325.0, true) ||
         !addProgressStateSample("Disabled preview", "75%", 0.0, 100.0, 75.0, false))
     {
         return false;
     }
 
-    // Live progress controlled by a slider.
     FWidgetLayout liveProgressSampleLayout;
     liveProgressSampleLayout.width = FLayoutLength::Percent(100.0f);
     liveProgressSampleLayout.height = FLayoutLength::Auto();
@@ -2271,32 +2244,29 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         liveProgressSampleLayout,
         MakeContainerLayout(ELayoutDirection::Vertical, 6.0f));
 
-    if (!liveProgressSample ||
-        !AddText(*liveProgressSample, "LIVE PROGRESS", "Kicker"))
-    {
+    if (!liveProgressSample || !AddText(*liveProgressSample, "LIVE PROGRESS", "Kicker"))
         return false;
-    }
+
+    FWidgetLayout liveProgressHeaderLayout;
+    liveProgressHeaderLayout.width = FLayoutLength::Percent(100.0f);
+    liveProgressHeaderLayout.height = FLayoutLength::Auto();
 
     ContainerWidget* liveProgressHeader = AddContainer(
         *liveProgressSample,
         nullptr,
-        FWidgetLayout{},
+        liveProgressHeaderLayout,
         MakeContainerLayout(
             ELayoutDirection::Horizontal,
             8.0f,
-            EAlignment::Center,
-            EJustification::SpaceBetween));
+            EAlignment::Start,
+            EJustification::Start));
 
-    TextWidget* liveProgressValueLabel = liveProgressHeader
-        ? AddText(*liveProgressHeader, "42%", "Mono")
-        : nullptr;
-
-    if (!liveProgressHeader ||
-        !AddText(*liveProgressHeader, "Importing assets", "Body") ||
-        !liveProgressValueLabel)
-    {
+    if (!liveProgressHeader || !AddText(*liveProgressHeader, "Importing assets", "Body"))
         return false;
-    }
+
+    TextWidget* liveProgressValueLabel = AddText(*liveProgressHeader, "42%", "Mono");
+    if (!liveProgressValueLabel)
+        return false;
 
     FWidgetLayout liveProgressBarLayout;
     liveProgressBarLayout.width = FLayoutLength::Units(180.0f);
@@ -2309,7 +2279,6 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         0.0,
         100.0,
         42.0);
-
     if (!liveProgressBar)
         return false;
 
@@ -2325,30 +2294,25 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         100.0,
         1.0,
         42.0);
-
     if (!liveProgressSlider)
         return false;
 
-    m_ProgressBarSliderValueChangedConnection =
-        liveProgressSlider->OnValueChanged().Connect(
-            [liveProgressBar, liveProgressValueLabel](TValueChangedEvent<double>& event)
-            {
-                liveProgressBar->SetValue(event.newValue);
+    m_ProgressBarSliderValueChangedConnection = liveProgressSlider->OnValueChanged().Connect(
+        [liveProgressBar, liveProgressValueLabel](TValueChangedEvent<double>& event)
+        {
+            liveProgressBar->SetValue(event.newValue);
+            liveProgressValueLabel->SetText(FormatSliderValue(event.newValue, 0, "%"));
+        });
 
-                liveProgressValueLabel->SetText(
-                    FormatSliderValue(event.newValue, 0, "%"));
-            });
-
-    m_ProgressBarValueChangedConnection =
-        liveProgressBar->OnValueChanged().Connect(
-            [](TValueChangedEvent<double>& event)
-            {
-                std::cout << "[SilverwarePlayground]: Progress changed "
-                          << FormatSliderValue(event.oldValue, 0, "%")
-                          << " -> "
-                          << FormatSliderValue(event.newValue, 0, "%")
-                          << ".\n";
-            });
+    m_ProgressBarValueChangedConnection = liveProgressBar->OnValueChanged().Connect(
+        [](TValueChangedEvent<double>& event)
+        {
+            std::cout << "[SilverwarePlayground]: Progress changed "
+                      << FormatSliderValue(event.oldValue, 0, "%")
+                      << " -> "
+                      << FormatSliderValue(event.newValue, 0, "%")
+                      << ".\n";
+        });
 
     // Vertical progress bar.
     FWidgetLayout verticalProgressSampleLayout;
@@ -2364,14 +2328,12 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
             12.0f,
             EAlignment::Center,
             EJustification::Start));
-
     if (!verticalProgressSample)
         return false;
 
     FWidgetLayout verticalProgressInfoLayout;
-    verticalProgressInfoLayout.width = FLayoutLength::Units(0.0f);
+    verticalProgressInfoLayout.width = FLayoutLength::Units(250.f);
     verticalProgressInfoLayout.height = FLayoutLength::Auto();
-    verticalProgressInfoLayout.flexGrow = 1.0f;
 
     ContainerWidget* verticalProgressInfo = AddContainer(
         *verticalProgressSample,
@@ -2391,7 +2353,7 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
 
     FWidgetLayout verticalProgressBarLayout;
     verticalProgressBarLayout.width = FLayoutLength::Units(12.0f);
-    verticalProgressBarLayout.height = FLayoutLength::Units(160.0f);
+    verticalProgressBarLayout.height = FLayoutLength::Units(180.0f);
 
     ProgressBarWidget* verticalProgressBar = AddProgressBar(
         *verticalProgressSample,
@@ -2401,13 +2363,13 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         100.0,
         68.0,
         EProgressBarOrientation::Vertical);
-
     if (!verticalProgressBar)
         return false;
 
-    // Footer
+    // Footer.
     FWidgetLayout footerLayout;
     footerLayout.height = FLayoutLength::Units(28.0f);
+    footerLayout.width = FLayoutLength::Auto();
     SetPadding(footerLayout, 0.0f, 12.0f, 0.0f, 12.0f);
 
     ContainerWidget* footer = AddContainer(
@@ -2415,19 +2377,26 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         "Toolbar",
         footerLayout,
         MakeContainerLayout(
-            ELayoutDirection::Horizontal, 12.0f,
-            EAlignment::Center, EJustification::SpaceBetween));
+            ELayoutDirection::Horizontal,
+            12.0f,
+            EAlignment::Center,
+            EJustification::SpaceBetween));
 
     if (!footer ||
-        !AddText(*footer, "READY", "Success") ||
-        !AddText(*footer, "RETAINED WIDGET TREE  /  INPUT ROUTER  /  INCREMENTAL SYNC", "Mono"))
+        !AddText(*footer, "Phase 2", "Success")
+        ||!AddText(*footer, "Extending Ranged Value Widgets + Scrollview", "Mono")
+        )
+    {
         return false;
+    }
 
     return true;
 }
 
 void SilverwareEditorRenderer::Tick(float deltaTime)
 {
+    (void)deltaTime;
+
     if (!m_Backend || !m_RootWidget)
         return;
 
@@ -2470,8 +2439,7 @@ void SilverwareEditorRenderer::Shutdown()
 
     m_ButtonPlayground = nullptr;
     m_InteractiveBlockPlayground = nullptr;
+    m_ProgressBarPlayground = nullptr;
     m_RootWidget.reset();
     m_Backend = nullptr;
 }
-
-
