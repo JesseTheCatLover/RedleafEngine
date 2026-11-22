@@ -24,9 +24,11 @@
 #include "Silverware/UI/Widgets/ButtonWidget.h"
 #include "Silverware/UI/Widgets/CheckboxWidget.h"
 #include "Silverware/UI/Widgets/ImageWidget.h"
+#include "Silverware/UI/Widgets/ProgressBarWidget.h"
 #include "Silverware/UI/Widgets/RadioButtonWidget.h"
 #include "Silverware/UI/Widgets/ToggleWidget.h"
 #include "Silverware/UI/Widgets/SliderWidget.h"
+#include "Silverware/UI/Widgets/RangedSliderWidget.h"
 
 namespace
 {
@@ -934,6 +936,49 @@ namespace
         return stream.str();
     }
 
+    std::string FormatRangedSliderValues(
+        const FRangedSliderValues& values,
+        int precision,
+        const char* suffix)
+    {
+        return FormatSliderValue(values.low, precision, suffix) + "  –  " +
+               FormatSliderValue(values.high, precision, suffix);
+    }
+
+    RangedSliderWidget* AddRangedSlider(
+        ContainerWidget& parent,
+        const char* variant,
+        FWidgetLayout layout,
+        double minimum,
+        double maximum,
+        double step,
+        double lowValue,
+        double highValue,
+        ESliderOrientation orientation = ESliderOrientation::Horizontal)
+    {
+        using namespace Silverware;
+
+        auto widget = Silverware::MakeUnique<RangedSliderWidget>();
+
+        if (variant && *variant)
+            widget->SetStyleVariant(variant);
+
+        widget->SetLayout(layout);
+        widget->SetOrientation(orientation);
+
+        if (!widget->SetRange(minimum, maximum) || !widget->SetStep(step))
+            return nullptr;
+
+        widget->SetValues(lowValue, highValue);
+
+        RangedSliderWidget* rawWidget = widget.get();
+
+        if (!parent.AddChild(Silverware::TUniquePtr<CoreWidget>(widget.release())))
+            return nullptr;
+
+        return rawWidget;
+    }
+
     SliderWidget* AddSlider(
         ContainerWidget& parent,
         const char* variant,
@@ -960,6 +1005,38 @@ namespace
         widget->SetValue(value);
 
         SliderWidget* rawWidget = widget.get();
+
+        if (!parent.AddChild(Silverware::TUniquePtr<CoreWidget>(widget.release())))
+            return nullptr;
+
+        return rawWidget;
+    }
+
+    ProgressBarWidget* AddProgressBar(
+    ContainerWidget& parent,
+    const char* variant,
+    FWidgetLayout layout,
+    double minimum,
+    double maximum,
+    double value,
+    EProgressBarOrientation orientation = EProgressBarOrientation::Horizontal)
+    {
+        using namespace Silverware;
+
+        auto widget = Silverware::MakeUnique<ProgressBarWidget>();
+
+        if (variant && *variant)
+            widget->SetStyleVariant(variant);
+
+        widget->SetLayout(layout);
+        widget->SetOrientation(orientation);
+
+        if (!widget->SetRange(minimum, maximum))
+            return nullptr;
+
+        widget->SetValue(value);
+
+        ProgressBarWidget* rawWidget = widget.get();
 
         if (!parent.AddChild(Silverware::TUniquePtr<CoreWidget>(widget.release())))
             return nullptr;
@@ -1556,95 +1633,95 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
     //                   << (event.newValue ? "selected" : "deselected") << ".\n";
     //     });
 
-    // Toggle examples
-    FWidgetLayout toggleListLayout;
-    toggleListLayout.width = FLayoutLength::Units(260.0f);
-    toggleListLayout.height = FLayoutLength::Auto();
-
-    ContainerWidget* toggleList = AddContainer(
-        *m_ButtonPlayground,
-        nullptr,
-        toggleListLayout,
-        MakeContainerLayout(
-            ELayoutDirection::Vertical,
-            8.0f,
-            EAlignment::Start,
-            EJustification::Start));
-
-    if (!toggleList ||
-        !AddText(*toggleList, "TOGGLES", "PanelTitle") ||
-        !AddText(*toggleList, "Independent on/off controls with animated thumbs.", "Body"))
-    {
-        return false;
-    }
-
-    FWidgetLayout toggleRowLayout;
-    toggleRowLayout.width = FLayoutLength::Percent(100.0f);
-    toggleRowLayout.height = FLayoutLength::Units(28.0f);
-
-    ToggleWidget* temporalUpscalingToggle = AddToggle(
-        *toggleList,
-        "Temporal Upscaling",
-        "Default",
-        toggleRowLayout);
-
-    ToggleWidget* dynamicResolutionToggle = AddToggle(
-        *toggleList,
-        "Dynamic Resolution",
-        "Default",
-        toggleRowLayout);
-
-    ToggleWidget* rayTracingToggle = AddToggle(
-        *toggleList,
-        "Ray Tracing",
-        "Default",
-        toggleRowLayout);
-
-    ToggleWidget* disabledToggle = AddToggle(
-        *toggleList,
-        "Read-only feature",
-        "Default",
-        toggleRowLayout);
-
-    if (!temporalUpscalingToggle || !dynamicResolutionToggle ||
-        !rayTracingToggle || !disabledToggle)
-    {
-        return false;
-    }
-
-    // Establish initial values before the root tree is attached to the UI context.
-    temporalUpscalingToggle->SetOn(true);
-    rayTracingToggle->SetOn(true);
-    disabledToggle->SetOn(true);
-    disabledToggle->SetEnabled(false);
-
-    m_ToggleChangedConnections[0] = temporalUpscalingToggle->OnToggledChanged().Connect(
-        [](TValueChangedEvent<bool>& event)
-        {
-            std::cout << "[SilverwarePlayground]: Temporal Upscaling "
-                      << (event.newValue ? "enabled" : "disabled") << ".\n";
-        });
-
-    m_ToggleChangedConnections[1] = dynamicResolutionToggle->OnToggledChanged().Connect(
-        [](TValueChangedEvent<bool>& event)
-        {
-            std::cout << "[SilverwarePlayground]: Dynamic Resolution "
-                      << (event.newValue ? "enabled" : "disabled") << ".\n";
-        });
-
-    m_ToggleChangedConnections[2] = rayTracingToggle->OnToggledChanged().Connect(
-        [](TValueChangedEvent<bool>& event)
-        {
-            std::cout << "[SilverwarePlayground]: Ray Tracing "
-                      << (event.newValue ? "enabled" : "disabled") << ".\n";
-        });
-
-    m_ToggleChangedConnections[3] = disabledToggle->OnToggledChanged().Connect(
-        [](TValueChangedEvent<bool>& event)
-        {
-            std::cout << "[SilverwarePlayground]: Read-only feature "
-                        << (event.newValue ? "enabled" : "disabled") << ".\n";
-        });
+    // // Toggle examples
+    // FWidgetLayout toggleListLayout;
+    // toggleListLayout.width = FLayoutLength::Units(260.0f);
+    // toggleListLayout.height = FLayoutLength::Auto();
+    //
+    // ContainerWidget* toggleList = AddContainer(
+    //     *m_ButtonPlayground,
+    //     nullptr,
+    //     toggleListLayout,
+    //     MakeContainerLayout(
+    //         ELayoutDirection::Vertical,
+    //         8.0f,
+    //         EAlignment::Start,
+    //         EJustification::Start));
+    //
+    // if (!toggleList ||
+    //     !AddText(*toggleList, "TOGGLES", "PanelTitle") ||
+    //     !AddText(*toggleList, "Independent on/off controls with animated thumbs.", "Body"))
+    // {
+    //     return false;
+    // }
+    //
+    // FWidgetLayout toggleRowLayout;
+    // toggleRowLayout.width = FLayoutLength::Percent(100.0f);
+    // toggleRowLayout.height = FLayoutLength::Units(28.0f);
+    //
+    // ToggleWidget* temporalUpscalingToggle = AddToggle(
+    //     *toggleList,
+    //     "Temporal Upscaling",
+    //     "Default",
+    //     toggleRowLayout);
+    //
+    // ToggleWidget* dynamicResolutionToggle = AddToggle(
+    //     *toggleList,
+    //     "Dynamic Resolution",
+    //     "Default",
+    //     toggleRowLayout);
+    //
+    // ToggleWidget* rayTracingToggle = AddToggle(
+    //     *toggleList,
+    //     "Ray Tracing",
+    //     "Default",
+    //     toggleRowLayout);
+    //
+    // ToggleWidget* disabledToggle = AddToggle(
+    //     *toggleList,
+    //     "Read-only feature",
+    //     "Default",
+    //     toggleRowLayout);
+    //
+    // if (!temporalUpscalingToggle || !dynamicResolutionToggle ||
+    //     !rayTracingToggle || !disabledToggle)
+    // {
+    //     return false;
+    // }
+    //
+    // // Establish initial values before the root tree is attached to the UI context.
+    // temporalUpscalingToggle->SetOn(true);
+    // rayTracingToggle->SetOn(true);
+    // disabledToggle->SetOn(true);
+    // disabledToggle->SetEnabled(false);
+    //
+    // m_ToggleChangedConnections[0] = temporalUpscalingToggle->OnToggledChanged().Connect(
+    //     [](TValueChangedEvent<bool>& event)
+    //     {
+    //         std::cout << "[SilverwarePlayground]: Temporal Upscaling "
+    //                   << (event.newValue ? "enabled" : "disabled") << ".\n";
+    //     });
+    //
+    // m_ToggleChangedConnections[1] = dynamicResolutionToggle->OnToggledChanged().Connect(
+    //     [](TValueChangedEvent<bool>& event)
+    //     {
+    //         std::cout << "[SilverwarePlayground]: Dynamic Resolution "
+    //                   << (event.newValue ? "enabled" : "disabled") << ".\n";
+    //     });
+    //
+    // m_ToggleChangedConnections[2] = rayTracingToggle->OnToggledChanged().Connect(
+    //     [](TValueChangedEvent<bool>& event)
+    //     {
+    //         std::cout << "[SilverwarePlayground]: Ray Tracing "
+    //                   << (event.newValue ? "enabled" : "disabled") << ".\n";
+    //     });
+    //
+    // m_ToggleChangedConnections[3] = disabledToggle->OnToggledChanged().Connect(
+    //     [](TValueChangedEvent<bool>& event)
+    //     {
+    //         std::cout << "[SilverwarePlayground]: Read-only feature "
+    //                     << (event.newValue ? "enabled" : "disabled") << ".\n";
+    //     });
 
     // Slider examples
     FWidgetLayout sliderListLayout;
@@ -1660,30 +1737,477 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
             10.0f,
             EAlignment::Start,
             EJustification::Start));
+    //
+    // if (!sliderList ||
+    //     !AddText(*sliderList, "SLIDERS", "PanelTitle") ||
+    //     !AddText(*sliderList, "Pointer drag, keyboard adjustment, snapping and orientation.", "Body"))
+    // {
+    //     return false;
+    // }
+    //
+    // const auto addHorizontalSliderSample = [this, sliderList](
+    //     const char* label,
+    //     double minimum,
+    //     double maximum,
+    //     double step,
+    //     double initialValue,
+    //     int precision,
+    //     const char* suffix,
+    //     std::size_t connectionIndex) -> bool
+    // {
+    //     FWidgetLayout sampleLayout;
+    //     sampleLayout.width = FLayoutLength::Percent(100.0f);
+    //     sampleLayout.height = FLayoutLength::Auto();
+    //
+    //     ContainerWidget* sample = AddContainer(
+    //         *sliderList,
+    //         nullptr,
+    //         sampleLayout,
+    //         MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
+    //
+    //     if (!sample)
+    //         return false;
+    //
+    //     FWidgetLayout headerLayout;
+    //     headerLayout.width = FLayoutLength::Percent(100.0f);
+    //     headerLayout.height = FLayoutLength::Auto();
+    //
+    //     ContainerWidget* header = AddContainer(
+    //         *sample,
+    //         nullptr,
+    //         headerLayout,
+    //         MakeContainerLayout(
+    //             ELayoutDirection::Horizontal,
+    //             8.0f,
+    //             EAlignment::Center,
+    //             EJustification::Start));
+    //
+    //     if (!header || !AddText(*header, label, "Body"))
+    //         return false;
+    //
+    //     TextWidget* valueLabel = AddText(
+    //         *header,
+    //         FormatSliderValue(initialValue, precision, suffix),
+    //         "Mono");
+    //
+    //     if (!valueLabel)
+    //         return false;
+    //
+    //     FWidgetLayout sliderLayout;
+    //     sliderLayout.width = FLayoutLength::Units(280.0f);
+    //     sliderLayout.height = FLayoutLength::Units(24.0f);
+    //
+    //     SliderWidget* slider = AddSlider(
+    //         *sample,
+    //         "Default",
+    //         sliderLayout,
+    //         minimum,
+    //         maximum,
+    //         step,
+    //         initialValue);
+    //
+    //     if (!slider)
+    //         return false;
+    //
+    //     const std::string sampleName(label);
+    //     const std::string valueSuffix(suffix ? suffix : "");
+    //
+    //     m_SliderValueChangedConnections[connectionIndex] = slider->OnValueChanged().Connect(
+    //         [valueLabel, precision, valueSuffix](TValueChangedEvent<double>& event)
+    //         {
+    //             valueLabel->SetText(FormatSliderValue(
+    //                 event.newValue,
+    //                 precision,
+    //                 valueSuffix.c_str()));
+    //         });
+    //
+    //     m_SliderValueCommittedConnections[connectionIndex] = slider->OnValueChangeCommitted().Connect(
+    //         [sampleName, precision, valueSuffix](TValueChangeCommittedEvent<double>& event)
+    //         {
+    //             std::cout << "[SilverwarePlayground]: " << sampleName
+    //                       << " committed "
+    //                       << FormatSliderValue(event.oldValue, precision, valueSuffix.c_str())
+    //                       << " -> "
+    //                       << FormatSliderValue(event.newValue, precision, valueSuffix.c_str())
+    //                       << ".\n";
+    //         });
+    //
+    //     return true;
+    // };
+    //
+    // if (!addHorizontalSliderSample(
+    //         "Master Volume", 0.0, 100.0, 1.0, 68.0, 0, "%", 0) ||
+    //     !addHorizontalSliderSample(
+    //         "Render Scale", 50.0, 150.0, 5.0, 100.0, 0, "%", 1))
+    // {
+    //     return false;
+    // }
+    //
+    // // Vertical slider: the value should increase as the thumb moves upward.
+    // FWidgetLayout verticalSampleLayout;
+    // verticalSampleLayout.width = FLayoutLength::Percent(100.0f);
+    // verticalSampleLayout.height = FLayoutLength::Auto();
+    //
+    // ContainerWidget* verticalSample = AddContainer(
+    //     *sliderList,
+    //     nullptr,
+    //     verticalSampleLayout,
+    //     MakeContainerLayout(
+    //         ELayoutDirection::Horizontal,
+    //         12.0f,
+    //         EAlignment::Center,
+    //         EJustification::Start));
+    //
+    // if (!verticalSample)
+    //     return false;
+    //
+    // FWidgetLayout exposureInfoLayout;
+    // exposureInfoLayout.width = FLayoutLength::Units(0.0f);
+    // exposureInfoLayout.height = FLayoutLength::Auto();
+    // exposureInfoLayout.flexGrow = 1.0f;
+    //
+    // ContainerWidget* exposureInfo = AddContainer(
+    //     *verticalSample,
+    //     nullptr,
+    //     exposureInfoLayout,
+    //     MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
+    //
+    // if (!exposureInfo ||
+    //     !AddText(*exposureInfo, "VERTICAL SLIDER", "Kicker"))
+    // {
+    //     return false;
+    // }
+    //
+    // TextWidget* exposureValueLabel = AddText(*exposureInfo, "0.0 EV", "Mono");
+    //
+    // if (!exposureValueLabel ||
+    //     !AddText(*exposureInfo, "Move upward to increase exposure.", "Body"))
+    // {
+    //     return false;
+    // }
+    //
+    // FWidgetLayout verticalSliderLayout;
+    // verticalSliderLayout.width = FLayoutLength::Units(24.0f);
+    // verticalSliderLayout.height = FLayoutLength::Units(160.0f);
+    //
+    // SliderWidget* exposureSlider = AddSlider(
+    //     *verticalSample,
+    //     "Vertical",
+    //     verticalSliderLayout,
+    //     -2.0,
+    //     2.0,
+    //     0.1,
+    //     0.0,
+    //     ESliderOrientation::Vertical);
+    //
+    // if (!exposureSlider)
+    //     return false;
+    //
+    // m_SliderValueChangedConnections[2] = exposureSlider->OnValueChanged().Connect(
+    //     [exposureValueLabel](TValueChangedEvent<double>& event)
+    //     {
+    //         exposureValueLabel->SetText(FormatSliderValue(event.newValue, 1, " EV"));
+    //     });
+    //
+    // m_SliderValueCommittedConnections[2] = exposureSlider->OnValueChangeCommitted().Connect(
+    //     [](TValueChangeCommittedEvent<double>& event)
+    //     {
+    //         std::cout << "[SilverwarePlayground]: Exposure committed "
+    //                   << FormatSliderValue(event.oldValue, 1, " EV")
+    //                   << " -> "
+    //                   << FormatSliderValue(event.newValue, 1, " EV")
+    //                   << ".\n";
+    //     });
+    //
+    // // Disabled-state sample. It should remain visible but ignore pointer and keyboard input.
+    // FWidgetLayout disabledSliderSampleLayout;
+    // disabledSliderSampleLayout.width = FLayoutLength::Percent(100.0f);
+    // disabledSliderSampleLayout.height = FLayoutLength::Auto();
+    //
+    // ContainerWidget* disabledSliderSample = AddContainer(
+    //     *sliderList,
+    //     nullptr,
+    //     disabledSliderSampleLayout,
+    //     MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
+    //
+    // if (!disabledSliderSample)
+    //     return false;
+    //
+    // FWidgetLayout disabledHeaderLayout;
+    // disabledHeaderLayout.width = FLayoutLength::Percent(100.0f);
+    // disabledHeaderLayout.height = FLayoutLength::Auto();
+    //
+    // ContainerWidget* disabledHeader = AddContainer(
+    //     *disabledSliderSample,
+    //     nullptr,
+    //     disabledHeaderLayout,
+    //     MakeContainerLayout(
+    //         ELayoutDirection::Horizontal,
+    //         8.0f,
+    //         EAlignment::Center,
+    //         EJustification::Start));
+    //
+    // if (!disabledHeader || !AddText(*disabledHeader, "Read-only preview", "Body") ||
+    //     !AddText(*disabledHeader, "75%", "Mono"))
+    // {
+    //     return false;
+    // }
+    //
+    // FWidgetLayout disabledSliderLayout;
+    // disabledSliderLayout.width = FLayoutLength::Units(280.0f);
+    // disabledSliderLayout.height = FLayoutLength::Units(24.0f);
+    //
+    // SliderWidget* disabledSlider = AddSlider(
+    //     *disabledSliderSample,
+    //     "Default",
+    //     disabledSliderLayout,
+    //     0.0,
+    //     100.0,
+    //     5.0,
+    //     75.0);
+    //
+    // if (!disabledSlider)
+    //     return false;
+    //
+    // disabledSlider->SetEnabled(false);
 
-    if (!sliderList ||
-        !AddText(*sliderList, "SLIDERS", "PanelTitle") ||
-        !AddText(*sliderList, "Pointer drag, keyboard adjustment, snapping and orientation.", "Body"))
+    // // Ranged slider examples: endpoint thumbs move independently, while the
+    // // selected handle translates the complete interval without changing width.
+    // if (!AddText(*sliderList, "RANGED SLIDERS", "PanelTitle") ||
+    //     !AddText(*sliderList,
+    //         "Drag either thumb to edit one endpoint. Drag the filled handle to move the whole range.",
+    //         "Body"))
+    // {
+    //     return false;
+    // }
+    //
+    // const auto addHorizontalRangedSliderSample = [this, sliderList](
+    //     const char* label,
+    //     double minimum,
+    //     double maximum,
+    //     double step,
+    //     double initialLow,
+    //     double initialHigh,
+    //     int precision,
+    //     const char* suffix,
+    //     std::size_t connectionIndex) -> bool
+    // {
+    //     FWidgetLayout sampleLayout;
+    //     sampleLayout.width = FLayoutLength::Percent(100.0f);
+    //     sampleLayout.height = FLayoutLength::Auto();
+    //
+    //     ContainerWidget* sample = AddContainer(
+    //         *sliderList,
+    //         nullptr,
+    //         sampleLayout,
+    //         MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
+    //
+    //     if (!sample)
+    //         return false;
+    //
+    //     FWidgetLayout headerLayout;
+    //     headerLayout.width = FLayoutLength::Percent(100.0f);
+    //     headerLayout.height = FLayoutLength::Auto();
+    //
+    //     ContainerWidget* header = AddContainer(
+    //         *sample,
+    //         nullptr,
+    //         headerLayout,
+    //         MakeContainerLayout(
+    //             ELayoutDirection::Horizontal,
+    //             8.0f,
+    //             EAlignment::Center,
+    //             EJustification::SpaceBetween));
+    //
+    //     if (!header || !AddText(*header, label, "Body"))
+    //         return false;
+    //
+    //     TextWidget* valueLabel = AddText(
+    //         *header,
+    //         FormatRangedSliderValues({initialLow, initialHigh}, precision, suffix),
+    //         "Mono");
+    //
+    //     if (!valueLabel)
+    //         return false;
+    //
+    //     FWidgetLayout sliderLayout;
+    //     sliderLayout.width = FLayoutLength::Units(280.0f);
+    //     sliderLayout.height = FLayoutLength::Units(24.0f);
+    //
+    //     RangedSliderWidget* slider = AddRangedSlider(
+    //         *sample,
+    //         "Default",
+    //         sliderLayout,
+    //         minimum,
+    //         maximum,
+    //         step,
+    //         initialLow,
+    //         initialHigh);
+    //
+    //     if (!slider)
+    //         return false;
+    //
+    //     const std::string sampleName(label);
+    //     const std::string valueSuffix(suffix ? suffix : "");
+    //
+    //     m_RangedSliderValuesChangedConnections[connectionIndex] =
+    //         slider->OnRangeChanged().Connect(
+    //             [valueLabel, precision, valueSuffix](TValueChangedEvent<FRangedSliderValues>& event)
+    //             {
+    //                 valueLabel->SetText(FormatRangedSliderValues(
+    //                     event.newValue,
+    //                     precision,
+    //                     valueSuffix.c_str()));
+    //             });
+    //
+    //     m_RangedSliderValuesCommittedConnections[connectionIndex] =
+    //         slider->OnRangeChangeCommitted().Connect(
+    //             [sampleName, precision, valueSuffix](
+    //                 TValueChangeCommittedEvent<FRangedSliderValues>& event)
+    //             {
+    //                 std::cout << "[SilverwarePlayground]: " << sampleName
+    //                           << " committed ["
+    //                           << FormatRangedSliderValues(event.oldValue, precision, valueSuffix.c_str())
+    //                           << "] -> ["
+    //                           << FormatRangedSliderValues(event.newValue, precision, valueSuffix.c_str())
+    //                           << "].\n";
+    //             });
+    //
+    //     return true;
+    // };
+    //
+    // if (!addHorizontalRangedSliderSample(
+    //         "Playback Loop", 0.0, 100.0, 1.0, 20.0, 80.0, 0, "%", 0) ||
+    //     !addHorizontalRangedSliderSample(
+    //         "Temperature Window", -20.0, 50.0, 0.5, 4.0, 28.0, 1, " °C", 1))
+    // {
+    //     return false;
+    // }
+    //
+    // // Vertical ranged slider: moving the selected handle translates both
+    // // endpoints while preserving their distance, and upward increases values.
+    // FWidgetLayout verticalRangeSampleLayout;
+    // verticalRangeSampleLayout.width = FLayoutLength::Percent(100.0f);
+    // verticalRangeSampleLayout.height = FLayoutLength::Auto();
+    //
+    // ContainerWidget* verticalRangeSample = AddContainer(
+    //     *sliderList,
+    //     nullptr,
+    //     verticalRangeSampleLayout,
+    //     MakeContainerLayout(
+    //         ELayoutDirection::Horizontal,
+    //         12.0f,
+    //         EAlignment::Center,
+    //         EJustification::Start));
+    //
+    // if (!verticalRangeSample)
+    //     return false;
+    //
+    // FWidgetLayout verticalRangeInfoLayout;
+    // verticalRangeInfoLayout.width = FLayoutLength::Units(0.0f);
+    // verticalRangeInfoLayout.height = FLayoutLength::Auto();
+    // verticalRangeInfoLayout.flexGrow = 1.0f;
+    //
+    // ContainerWidget* verticalRangeInfo = AddContainer(
+    //     *verticalRangeSample,
+    //     nullptr,
+    //     verticalRangeInfoLayout,
+    //     MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
+    //
+    // if (!verticalRangeInfo ||
+    //     !AddText(*verticalRangeInfo, "VERTICAL RANGE", "Kicker"))
+    // {
+    //     return false;
+    // }
+    //
+    // TextWidget* verticalRangeValueLabel = AddText(
+    //     *verticalRangeInfo,
+    //     FormatRangedSliderValues({-4.0, 6.0}, 1, " dB"),
+    //     "Mono");
+    //
+    // if (!verticalRangeValueLabel ||
+    //     !AddText(*verticalRangeInfo,
+    //         "Drag either endpoint or move the selected range upward.",
+    //         "Body"))
+    // {
+    //     return false;
+    // }
+    //
+    // FWidgetLayout verticalRangeSliderLayout;
+    // verticalRangeSliderLayout.width = FLayoutLength::Units(24.0f);
+    // verticalRangeSliderLayout.height = FLayoutLength::Units(160.0f);
+    //
+    // RangedSliderWidget* verticalRangeSlider = AddRangedSlider(
+    //     *verticalRangeSample,
+    //     "Vertical",
+    //     verticalRangeSliderLayout,
+    //     -10.0,
+    //     10.0,
+    //     0.5,
+    //     -4.0,
+    //     6.0,
+    //     ESliderOrientation::Vertical);
+    //
+    // if (!verticalRangeSlider)
+    //     return false;
+    //
+    // m_RangedSliderValuesChangedConnections[2] =
+    //     verticalRangeSlider->OnRangeChanged().Connect(
+    //         [verticalRangeValueLabel](TValueChangedEvent<FRangedSliderValues>& event)
+    //         {
+    //             verticalRangeValueLabel->SetText(FormatRangedSliderValues(event.newValue, 1, " dB"));
+    //         });
+    //
+    // m_RangedSliderValuesCommittedConnections[2] =
+    //     verticalRangeSlider->OnRangeChangeCommitted().Connect(
+    //         [](TValueChangeCommittedEvent<FRangedSliderValues>& event)
+    //         {
+    //             std::cout << "[SilverwarePlayground]: Vertical range committed ["
+    //                       << FormatRangedSliderValues(event.oldValue, 1, " dB")
+    //                       << "] -> ["
+    //                       << FormatRangedSliderValues(event.newValue, 1, " dB")
+    //                       << "].\n";
+    //         });
+
+        // Progress bar examples.
+    FWidgetLayout progressBarPlaygroundLayout;
+    progressBarPlaygroundLayout.width = FLayoutLength::Percent(100.0f);
+    progressBarPlaygroundLayout.height = FLayoutLength::Auto();
+
+    m_ProgressBarPlayground = AddContainer(
+        *sliderList,
+        nullptr,
+        progressBarPlaygroundLayout,
+        MakeContainerLayout(
+            ELayoutDirection::Vertical,
+            10.0f,
+            EAlignment::Start,
+            EJustification::Start));
+
+    if (!m_ProgressBarPlayground ||
+        !AddText(*m_ProgressBarPlayground, "PROGRESS BARS", "PanelTitle") ||
+        !AddText(*m_ProgressBarPlayground,
+            "Determinate progress, value ranges and orientation.",
+            "Body"))
     {
         return false;
     }
 
-    const auto addHorizontalSliderSample = [this, sliderList](
+    // Static progress states.
+    const auto addProgressStateSample = [this](
         const char* label,
+        const char* valueText,
         double minimum,
         double maximum,
-        double step,
-        double initialValue,
-        int precision,
-        const char* suffix,
-        std::size_t connectionIndex) -> bool
+        double value,
+        bool bEnabled) -> bool
     {
         FWidgetLayout sampleLayout;
         sampleLayout.width = FLayoutLength::Percent(100.0f);
         sampleLayout.height = FLayoutLength::Auto();
 
         ContainerWidget* sample = AddContainer(
-            *sliderList,
+            *m_ProgressBarPlayground,
             nullptr,
             sampleLayout,
             MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
@@ -1691,208 +2215,195 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
         if (!sample)
             return false;
 
-        FWidgetLayout headerLayout;
-        headerLayout.width = FLayoutLength::Percent(100.0f);
-        headerLayout.height = FLayoutLength::Auto();
-
         ContainerWidget* header = AddContainer(
             *sample,
             nullptr,
-            headerLayout,
+            FWidgetLayout{},
             MakeContainerLayout(
                 ELayoutDirection::Horizontal,
                 8.0f,
                 EAlignment::Center,
-                EJustification::Start));
+                EJustification::SpaceBetween));
 
-        if (!header || !AddText(*header, label, "Body"))
+        if (!header ||
+            !AddText(*header, label, "Body") ||
+            !AddText(*header, valueText, "Mono"))
+        {
             return false;
+        }
 
-        TextWidget* valueLabel = AddText(
-            *header,
-            FormatSliderValue(initialValue, precision, suffix),
-            "Mono");
+        FWidgetLayout progressBarLayout;
+        progressBarLayout.width = FLayoutLength::Units(180.0f);
+        progressBarLayout.height = FLayoutLength::Units(12.0f);
 
-        if (!valueLabel)
-            return false;
-
-        FWidgetLayout sliderLayout;
-        sliderLayout.width = FLayoutLength::Units(280.0f);
-        sliderLayout.height = FLayoutLength::Units(24.0f);
-
-        SliderWidget* slider = AddSlider(
+        ProgressBarWidget* progressBar = AddProgressBar(
             *sample,
             "Default",
-            sliderLayout,
+            progressBarLayout,
             minimum,
             maximum,
-            step,
-            initialValue);
+            value);
 
-        if (!slider)
+        if (!progressBar)
             return false;
 
-        const std::string sampleName(label);
-        const std::string valueSuffix(suffix ? suffix : "");
-
-        m_SliderValueChangedConnections[connectionIndex] = slider->OnValueChanged().Connect(
-            [valueLabel, precision, valueSuffix](TValueChangedEvent<double>& event)
-            {
-                valueLabel->SetText(FormatSliderValue(
-                    event.newValue,
-                    precision,
-                    valueSuffix.c_str()));
-            });
-
-        m_SliderValueCommittedConnections[connectionIndex] = slider->OnValueChangeCommitted().Connect(
-            [sampleName, precision, valueSuffix](TValueChangeCommittedEvent<double>& event)
-            {
-                std::cout << "[SilverwarePlayground]: " << sampleName
-                          << " committed "
-                          << FormatSliderValue(event.oldValue, precision, valueSuffix.c_str())
-                          << " -> "
-                          << FormatSliderValue(event.newValue, precision, valueSuffix.c_str())
-                          << ".\n";
-            });
+        progressBar->SetEnabled(bEnabled);
 
         return true;
     };
 
-    if (!addHorizontalSliderSample(
-            "Master Volume", 0.0, 100.0, 1.0, 68.0, 0, "%", 0) ||
-        !addHorizontalSliderSample(
-            "Render Scale", 50.0, 150.0, 5.0, 100.0, 0, "%", 1))
+    if (!addProgressStateSample("Empty", "0%", 0.0, 100.0, 0.0, true) ||
+        !addProgressStateSample("Almost complete", "75%", 0.0, 100.0, 75.0, true) ||
+        !addProgressStateSample("Custom range", "325 / 500", 0.0, 500.0, 325.0, true) ||
+        !addProgressStateSample("Disabled preview", "75%", 0.0, 100.0, 75.0, false))
     {
         return false;
     }
 
-    // Vertical slider: the value should increase as the thumb moves upward.
-    FWidgetLayout verticalSampleLayout;
-    verticalSampleLayout.width = FLayoutLength::Percent(100.0f);
-    verticalSampleLayout.height = FLayoutLength::Auto();
+    // Live progress controlled by a slider.
+    FWidgetLayout liveProgressSampleLayout;
+    liveProgressSampleLayout.width = FLayoutLength::Percent(100.0f);
+    liveProgressSampleLayout.height = FLayoutLength::Auto();
 
-    ContainerWidget* verticalSample = AddContainer(
-        *sliderList,
+    ContainerWidget* liveProgressSample = AddContainer(
+        *m_ProgressBarPlayground,
         nullptr,
-        verticalSampleLayout,
+        liveProgressSampleLayout,
+        MakeContainerLayout(ELayoutDirection::Vertical, 6.0f));
+
+    if (!liveProgressSample ||
+        !AddText(*liveProgressSample, "LIVE PROGRESS", "Kicker"))
+    {
+        return false;
+    }
+
+    ContainerWidget* liveProgressHeader = AddContainer(
+        *liveProgressSample,
+        nullptr,
+        FWidgetLayout{},
+        MakeContainerLayout(
+            ELayoutDirection::Horizontal,
+            8.0f,
+            EAlignment::Center,
+            EJustification::SpaceBetween));
+
+    TextWidget* liveProgressValueLabel = liveProgressHeader
+        ? AddText(*liveProgressHeader, "42%", "Mono")
+        : nullptr;
+
+    if (!liveProgressHeader ||
+        !AddText(*liveProgressHeader, "Importing assets", "Body") ||
+        !liveProgressValueLabel)
+    {
+        return false;
+    }
+
+    FWidgetLayout liveProgressBarLayout;
+    liveProgressBarLayout.width = FLayoutLength::Units(180.0f);
+    liveProgressBarLayout.height = FLayoutLength::Units(12.0f);
+
+    ProgressBarWidget* liveProgressBar = AddProgressBar(
+        *liveProgressSample,
+        "Default",
+        liveProgressBarLayout,
+        0.0,
+        100.0,
+        42.0);
+
+    if (!liveProgressBar)
+        return false;
+
+    FWidgetLayout liveProgressSliderLayout;
+    liveProgressSliderLayout.width = FLayoutLength::Units(280.0f);
+    liveProgressSliderLayout.height = FLayoutLength::Units(24.0f);
+
+    SliderWidget* liveProgressSlider = AddSlider(
+        *liveProgressSample,
+        "Default",
+        liveProgressSliderLayout,
+        0.0,
+        100.0,
+        1.0,
+        42.0);
+
+    if (!liveProgressSlider)
+        return false;
+
+    m_ProgressBarSliderValueChangedConnection =
+        liveProgressSlider->OnValueChanged().Connect(
+            [liveProgressBar, liveProgressValueLabel](TValueChangedEvent<double>& event)
+            {
+                liveProgressBar->SetValue(event.newValue);
+
+                liveProgressValueLabel->SetText(
+                    FormatSliderValue(event.newValue, 0, "%"));
+            });
+
+    m_ProgressBarValueChangedConnection =
+        liveProgressBar->OnValueChanged().Connect(
+            [](TValueChangedEvent<double>& event)
+            {
+                std::cout << "[SilverwarePlayground]: Progress changed "
+                          << FormatSliderValue(event.oldValue, 0, "%")
+                          << " -> "
+                          << FormatSliderValue(event.newValue, 0, "%")
+                          << ".\n";
+            });
+
+    // Vertical progress bar.
+    FWidgetLayout verticalProgressSampleLayout;
+    verticalProgressSampleLayout.width = FLayoutLength::Percent(100.0f);
+    verticalProgressSampleLayout.height = FLayoutLength::Auto();
+
+    ContainerWidget* verticalProgressSample = AddContainer(
+        *m_ProgressBarPlayground,
+        nullptr,
+        verticalProgressSampleLayout,
         MakeContainerLayout(
             ELayoutDirection::Horizontal,
             12.0f,
             EAlignment::Center,
             EJustification::Start));
 
-    if (!verticalSample)
+    if (!verticalProgressSample)
         return false;
 
-    FWidgetLayout exposureInfoLayout;
-    exposureInfoLayout.width = FLayoutLength::Units(0.0f);
-    exposureInfoLayout.height = FLayoutLength::Auto();
-    exposureInfoLayout.flexGrow = 1.0f;
+    FWidgetLayout verticalProgressInfoLayout;
+    verticalProgressInfoLayout.width = FLayoutLength::Units(0.0f);
+    verticalProgressInfoLayout.height = FLayoutLength::Auto();
+    verticalProgressInfoLayout.flexGrow = 1.0f;
 
-    ContainerWidget* exposureInfo = AddContainer(
-        *verticalSample,
+    ContainerWidget* verticalProgressInfo = AddContainer(
+        *verticalProgressSample,
         nullptr,
-        exposureInfoLayout,
+        verticalProgressInfoLayout,
         MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
 
-    if (!exposureInfo ||
-        !AddText(*exposureInfo, "VERTICAL SLIDER", "Kicker"))
+    if (!verticalProgressInfo ||
+        !AddText(*verticalProgressInfo, "VERTICAL PROGRESS", "Kicker") ||
+        !AddText(*verticalProgressInfo, "68%", "Mono") ||
+        !AddText(*verticalProgressInfo,
+            "Vertical progress fill and track orientation.",
+            "Body"))
     {
         return false;
     }
 
-    TextWidget* exposureValueLabel = AddText(*exposureInfo, "0.0 EV", "Mono");
+    FWidgetLayout verticalProgressBarLayout;
+    verticalProgressBarLayout.width = FLayoutLength::Units(12.0f);
+    verticalProgressBarLayout.height = FLayoutLength::Units(160.0f);
 
-    if (!exposureValueLabel ||
-        !AddText(*exposureInfo, "Move upward to increase exposure.", "Body"))
-    {
-        return false;
-    }
-
-    FWidgetLayout verticalSliderLayout;
-    verticalSliderLayout.width = FLayoutLength::Units(24.0f);
-    verticalSliderLayout.height = FLayoutLength::Units(160.0f);
-
-    SliderWidget* exposureSlider = AddSlider(
-        *verticalSample,
+    ProgressBarWidget* verticalProgressBar = AddProgressBar(
+        *verticalProgressSample,
         "Vertical",
-        verticalSliderLayout,
-        -2.0,
-        2.0,
-        0.1,
-        0.0,
-        ESliderOrientation::Vertical);
-
-    if (!exposureSlider)
-        return false;
-
-    m_SliderValueChangedConnections[2] = exposureSlider->OnValueChanged().Connect(
-        [exposureValueLabel](TValueChangedEvent<double>& event)
-        {
-            exposureValueLabel->SetText(FormatSliderValue(event.newValue, 1, " EV"));
-        });
-
-    m_SliderValueCommittedConnections[2] = exposureSlider->OnValueChangeCommitted().Connect(
-        [](TValueChangeCommittedEvent<double>& event)
-        {
-            std::cout << "[SilverwarePlayground]: Exposure committed "
-                      << FormatSliderValue(event.oldValue, 1, " EV")
-                      << " -> "
-                      << FormatSliderValue(event.newValue, 1, " EV")
-                      << ".\n";
-        });
-
-    // Disabled-state sample. It should remain visible but ignore pointer and keyboard input.
-    FWidgetLayout disabledSliderSampleLayout;
-    disabledSliderSampleLayout.width = FLayoutLength::Percent(100.0f);
-    disabledSliderSampleLayout.height = FLayoutLength::Auto();
-
-    ContainerWidget* disabledSliderSample = AddContainer(
-        *sliderList,
-        nullptr,
-        disabledSliderSampleLayout,
-        MakeContainerLayout(ELayoutDirection::Vertical, 5.0f));
-
-    if (!disabledSliderSample)
-        return false;
-
-    FWidgetLayout disabledHeaderLayout;
-    disabledHeaderLayout.width = FLayoutLength::Percent(100.0f);
-    disabledHeaderLayout.height = FLayoutLength::Auto();
-
-    ContainerWidget* disabledHeader = AddContainer(
-        *disabledSliderSample,
-        nullptr,
-        disabledHeaderLayout,
-        MakeContainerLayout(
-            ELayoutDirection::Horizontal,
-            8.0f,
-            EAlignment::Center,
-            EJustification::Start));
-
-    if (!disabledHeader || !AddText(*disabledHeader, "Read-only preview", "Body") ||
-        !AddText(*disabledHeader, "75%", "Mono"))
-    {
-        return false;
-    }
-
-    FWidgetLayout disabledSliderLayout;
-    disabledSliderLayout.width = FLayoutLength::Units(280.0f);
-    disabledSliderLayout.height = FLayoutLength::Units(24.0f);
-
-    SliderWidget* disabledSlider = AddSlider(
-        *disabledSliderSample,
-        "Default",
-        disabledSliderLayout,
+        verticalProgressBarLayout,
         0.0,
         100.0,
-        5.0,
-        75.0);
+        68.0,
+        EProgressBarOrientation::Vertical);
 
-    if (!disabledSlider)
+    if (!verticalProgressBar)
         return false;
-
-    disabledSlider->SetEnabled(false);
 
     // Footer
     FWidgetLayout footerLayout;
@@ -1949,6 +2460,12 @@ void SilverwareEditorRenderer::Shutdown()
         connection.Disconnect();
 
     for (auto& connection : m_SliderValueCommittedConnections)
+        connection.Disconnect();
+
+    for (auto& connection : m_RangedSliderValuesChangedConnections)
+        connection.Disconnect();
+
+    for (auto& connection : m_RangedSliderValuesCommittedConnections)
         connection.Disconnect();
 
     m_ButtonPlayground = nullptr;
