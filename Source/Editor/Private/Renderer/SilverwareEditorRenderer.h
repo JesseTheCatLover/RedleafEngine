@@ -5,7 +5,7 @@
     #include "Silverware/Core/Events/EventConnection.h"
     #include "Silverware/Memory/SmartPointers.h"
 
-    class SilverwareBackend;
+    class SilverwareEditorBackend;
 
     namespace Silverware
     {
@@ -17,7 +17,7 @@
     private:
         [[nodiscard]] bool BuildPlaygroundLayout();
 
-        SilverwareBackend* m_Backend = nullptr;
+        SilverwareEditorBackend* m_Backend = nullptr;
 
         Silverware::TUniquePtr<Silverware::ContainerWidget> m_RootWidget;
 
@@ -47,7 +47,7 @@
         SilverwareEditorRenderer(const SilverwareEditorRenderer&) = delete;
         SilverwareEditorRenderer& operator=(const SilverwareEditorRenderer&) = delete;
 
-        [[nodiscard]] bool Initialize(SilverwareBackend& backend);
+        [[nodiscard]] bool Initialize(SilverwareEditorBackend& backend);
 
         void Tick(float deltaTime);
         void Shutdown();

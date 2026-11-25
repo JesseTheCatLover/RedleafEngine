@@ -17,7 +17,7 @@ class SilverwareInputBridge;
 class EditorRuntime;
 class IPlatformWindow;
 
-class SilverwareBackend
+class SilverwareEditorBackend
 {
 private:
     TUniquePtr<Silverware::IRenderingContext> m_RenderingContext;
@@ -31,11 +31,11 @@ private:
     Silverware::SilverwareUIContext* m_EditorUIContext = nullptr;
 
 public:
-    SilverwareBackend();
-    ~SilverwareBackend();
+    SilverwareEditorBackend();
+    ~SilverwareEditorBackend();
 
-    SilverwareBackend(const SilverwareBackend&) = delete;
-    SilverwareBackend& operator=(const SilverwareBackend&) = delete;
+    SilverwareEditorBackend(const SilverwareEditorBackend&) = delete;
+    SilverwareEditorBackend& operator=(const SilverwareEditorBackend&) = delete;
 
     [[nodiscard]] bool Initialize(EditorRuntime& editorRuntime, InputManager& inputManager, IPlatformWindow& window,
         std::span<const Silverware::FResourcePath> registeredFonts);

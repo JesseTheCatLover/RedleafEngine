@@ -8,7 +8,7 @@
 #include "Core/Memory/SmartPointers.h"
 
 class SilverwareEditorRenderer;
-class SilverwareBackend;
+class SilverwareEditorBackend;
 class EditorHost;
 class EditorRuntime;
 class IPlatformWindow;
@@ -19,7 +19,7 @@ class SilverwareEditorApp final : public IEditorBridge
 private:
     IPlatformWindow* m_Window = nullptr;
 
-    TUniquePtr<SilverwareBackend> m_SilverwareBackend;
+    TUniquePtr<SilverwareEditorBackend> m_SilverwareBackend;
     TUniquePtr<SilverwareEditorRenderer> m_SilverwareRenderer;
 
     TUniquePtr<EditorRuntime> m_EditorRuntime;

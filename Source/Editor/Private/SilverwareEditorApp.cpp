@@ -11,7 +11,7 @@
 #include <iostream>
 
 #include "Renderer/SilverwareEditorRenderer.h"
-#include "Renderer/Backends/SilverwareBackend.h"
+#include "Renderer/Backends/SilverwareEditorBackend.h"
 
 SilverwareEditorApp::SilverwareEditorApp()
 {
@@ -60,7 +60,7 @@ void SilverwareEditorApp::OnProjectInitialized(IPlatformWindow* window, ProjectC
     m_EditorRuntime = TUniquePtr<EditorRuntime>(new EditorRuntime());
     m_EditorHost = TUniquePtr<EditorHost>(new EditorHost(*m_EditorRuntime));
 
-    m_SilverwareBackend = MakeUnique<SilverwareBackend>();
+    m_SilverwareBackend = MakeUnique<SilverwareEditorBackend>();
 
     if (!m_SilverwareBackend->Initialize(*m_EditorRuntime, m_EditorRuntime->GetInputManager(), *window))
     {

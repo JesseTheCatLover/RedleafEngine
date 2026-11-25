@@ -2,7 +2,7 @@
 
 #include "SilverwareEditorRenderer.h"
 
-#include "Backends/SilverwareBackend.h"
+#include "Backends/SilverwareEditorBackend.h"
 
 #include "Silverware/Core/Styling/StyleModel.h"
 #include "Silverware/Core/Widgets/ContainerWidget.h"
@@ -1116,7 +1116,7 @@ SilverwareEditorRenderer::~SilverwareEditorRenderer()
     Shutdown();
 }
 
-bool SilverwareEditorRenderer::Initialize(SilverwareBackend& backend)
+bool SilverwareEditorRenderer::Initialize(SilverwareEditorBackend& backend)
 {
     Shutdown();
 

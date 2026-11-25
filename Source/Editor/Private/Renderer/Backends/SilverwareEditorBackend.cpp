@@ -1,6 +1,6 @@
 // Copyright 2026 JesseTheCatLover. All Rights Reserved.
 
-#include "SilverwareBackend.h"
+#include "SilverwareEditorBackend.h"
 
 #include "EditorRuntime.h"
 #include "Rendering/IPlatformWindow.h"
@@ -66,16 +66,16 @@ namespace
     }
 }
 
-SilverwareBackend::SilverwareBackend()
+SilverwareEditorBackend::SilverwareEditorBackend()
 {
 }
 
-SilverwareBackend::~SilverwareBackend()
+SilverwareEditorBackend::~SilverwareEditorBackend()
 {
     Shutdown();
 }
 
-bool SilverwareBackend::Initialize(EditorRuntime& editorRuntime, InputManager& inputManager, IPlatformWindow& window,
+bool SilverwareEditorBackend::Initialize(EditorRuntime& editorRuntime, InputManager& inputManager, IPlatformWindow& window,
     std::span<const Silverware::FResourcePath> registeredFonts)
 {
     Shutdown();
@@ -145,12 +145,12 @@ bool SilverwareBackend::Initialize(EditorRuntime& editorRuntime, InputManager& i
     return true;
 }
 
-bool SilverwareBackend::Initialize(EditorRuntime& editorRuntime, InputManager& inputManager, IPlatformWindow& window)
+bool SilverwareEditorBackend::Initialize(EditorRuntime& editorRuntime, InputManager& inputManager, IPlatformWindow& window)
 {
     return Initialize(editorRuntime, inputManager, window, std::span<const Silverware::FResourcePath>{});
 }
 
-bool SilverwareBackend::MountResources(EditorRuntime& editorRuntime)
+bool SilverwareEditorBackend::MountResources(EditorRuntime& editorRuntime)
 {
     // The host owns the provider and mounts only host namespaces.
     m_ResourceProvider = MakeUnique<Silverware::FLayeredResourceProvider>();
@@ -175,7 +175,7 @@ bool SilverwareBackend::MountResources(EditorRuntime& editorRuntime)
     return true;
 }
 
-bool SilverwareBackend::InitializeRuntime(IPlatformWindow& window)
+bool SilverwareEditorBackend::InitializeRuntime(IPlatformWindow& window)
 {
     if (!m_RenderingContext || !m_ResourceProvider || !m_FontRegistry)
     {
@@ -278,13 +278,13 @@ bool SilverwareBackend::InitializeRuntime(IPlatformWindow& window)
     return true;
 }
 
-bool SilverwareBackend::Synchronize(Silverware::CoreWidget& root, Silverware::EBackendSyncMode mode)
+bool SilverwareEditorBackend::Synchronize(Silverware::CoreWidget& root, Silverware::EBackendSyncMode mode)
 {
     return m_EditorUIContext &&
         m_EditorUIContext->Synchronize(root, mode);
 }
 
-Silverware::FStylesheetLoadResult SilverwareBackend::LoadStylesheet(const Silverware::FResourcePath& path)
+Silverware::FStylesheetLoadResult SilverwareEditorBackend::LoadStylesheet(const Silverware::FResourcePath& path)
 {
     if (m_EditorUIContext)
         return m_EditorUIContext->LoadStylesheet(path);
@@ -295,7 +295,7 @@ Silverware::FStylesheetLoadResult SilverwareBackend::LoadStylesheet(const Silver
     return result;
 }
 
-bool SilverwareBackend::LoadTheme(Silverware::FThemeDefinition theme, std::string* outError)
+bool SilverwareEditorBackend::LoadTheme(Silverware::FThemeDefinition theme, std::string* outError)
 {
     if (!m_EditorUIContext)
     {
@@ -308,7 +308,7 @@ bool SilverwareBackend::LoadTheme(Silverware::FThemeDefinition theme, std::strin
     return m_EditorUIContext->LoadTheme(std::move(theme), outError);
 }
 
-bool SilverwareBackend::UnloadTheme(const Silverware::FThemeID& themeID, std::string* outError)
+bool SilverwareEditorBackend::UnloadTheme(const Silverware::FThemeID& themeID, std::string* outError)
 {
     if (!m_EditorUIContext)
     {
@@ -321,7 +321,7 @@ bool SilverwareBackend::UnloadTheme(const Silverware::FThemeID& themeID, std::st
     return m_EditorUIContext->UnloadTheme(themeID, outError);
 }
 
-bool SilverwareBackend::SetActiveTheme(
+bool SilverwareEditorBackend::SetActiveTheme(
     const Silverware::FThemeID& themeID,
     std::string* outError)
 {
@@ -336,13 +336,13 @@ bool SilverwareBackend::SetActiveTheme(
     return m_EditorUIContext->SetActiveTheme(themeID, outError);
 }
 
-void SilverwareBackend::ClearActiveTheme() noexcept
+void SilverwareEditorBackend::ClearActiveTheme() noexcept
 {
     if (m_EditorUIContext)
         m_EditorUIContext->ClearActiveTheme();
 }
 
-bool SilverwareBackend::TryGetWidgetSize(const Silverware::CoreWidget& widget, float& outWidth, float& outHeight) const
+bool SilverwareEditorBackend::TryGetWidgetSize(const Silverware::CoreWidget& widget, float& outWidth, float& outHeight) const
 {
     outWidth = 0.0f;
     outHeight = 0.0f;
@@ -351,17 +351,17 @@ bool SilverwareBackend::TryGetWidgetSize(const Silverware::CoreWidget& widget, f
         m_EditorUIContext->TryGetWidgetSize(widget, outWidth, outHeight);
 }
 
-Silverware::SilverwareUIContext* SilverwareBackend::GetEditorUIContext() noexcept
+Silverware::SilverwareUIContext* SilverwareEditorBackend::GetEditorUIContext() noexcept
 {
     return m_EditorUIContext;
 }
 
-Silverware::SilverwareHost* SilverwareBackend::GetHost() noexcept
+Silverware::SilverwareHost* SilverwareEditorBackend::GetHost() noexcept
 {
     return m_Host.get();
 }
 
-void SilverwareBackend::Render(IPlatformWindow& window)
+void SilverwareEditorBackend::Render(IPlatformWindow& window)
 {
     if (!IsInitialized())
         return;
@@ -378,7 +378,7 @@ void SilverwareBackend::Render(IPlatformWindow& window)
     m_EditorUIContext->Render();
 }
 
-void SilverwareBackend::Shutdown()
+void SilverwareEditorBackend::Shutdown()
 {
     // Disconnect input callbacks before destroying the UI context.
     m_InputBridge.reset();
@@ -400,7 +400,7 @@ void SilverwareBackend::Shutdown()
     m_RenderingContext.reset();
 }
 
-bool SilverwareBackend::IsInitialized() const noexcept
+bool SilverwareEditorBackend::IsInitialized() const noexcept
 {
     return m_Host && m_Host->IsInitialized() &&
         m_EditorUIContext && m_EditorUIContext->IsInitialized();
