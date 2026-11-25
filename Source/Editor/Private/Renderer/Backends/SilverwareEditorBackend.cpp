@@ -87,7 +87,7 @@ bool SilverwareEditorBackend::Initialize(EditorRuntime& editorRuntime, InputMana
 
     if (!m_RenderingContext)
     {
-        std::cerr << "[SilverwareBackend]: Failed to create rendering context.\n";
+        std::cerr << "[SilverwareEditorBackend]: Failed to create rendering context.\n";
         Shutdown();
         return false;
     }
@@ -107,11 +107,11 @@ bool SilverwareEditorBackend::Initialize(EditorRuntime& editorRuntime, InputMana
     const auto engineFontReport = m_FontRegistry->RegisterFontDirectory("engine:/Editor/Fonts", engineFontOptions);
 
     if (!engineFontReport.Completed())
-        std::cerr << "[SilverwareBackend]: Could not enumerate engine editor fonts.\n";
+        std::cerr << "[SilverwareEditorBackend]: Could not enumerate engine editor fonts.\n";
 
     for (const auto& diagnostic : engineFontReport.diagnostics)
     {
-        std::cerr << "[SilverwareBackend]: Rejected engine font "
+        std::cerr << "[SilverwareEditorBackend]: Rejected engine font "
                   << diagnostic.path.ToString() << " ("
                   << GetFontRegistrationStatusName(diagnostic.status) << ").\n";
     }
@@ -121,13 +121,13 @@ bool SilverwareEditorBackend::Initialize(EditorRuntime& editorRuntime, InputMana
 
     for (const auto& diagnostic : preparedFontReport.diagnostics)
     {
-        std::cerr << "[SilverwareBackend]: Rejected prepared font "
+        std::cerr << "[SilverwareEditorBackend]: Rejected prepared font "
                   << diagnostic.path.ToString() << " ("
                   << GetFontRegistrationStatusName(diagnostic.status) << ").\n";
     }
 
     if (m_FontRegistry->IsEmpty())
-        std::cerr << "[SilverwareBackend]: No host fonts passed registration validation; "
+        std::cerr << "[SilverwareEditorBackend]: No host fonts passed registration validation; "
                      "continuing without host fonts.\n";
 
     if (!InitializeRuntime(window))
@@ -140,7 +140,7 @@ bool SilverwareEditorBackend::Initialize(EditorRuntime& editorRuntime, InputMana
 
     if (!m_InputBridge->Initialize(inputManager, *m_EditorUIContext))
     {
-        std::cerr << "[SilverwareBackend]: Failed to initialize input bridge.\n";
+        std::cerr << "[SilverwareEditorBackend]: Failed to initialize input bridge.\n";
         Shutdown();
         return false;
     }
@@ -162,7 +162,7 @@ bool SilverwareEditorBackend::MountResources(EditorRuntime& editorRuntime)
 
     if (!engineSource || !m_ResourceProvider->Mount("engine", 0, engineSource))
     {
-        std::cerr << "[SilverwareBackend]: Failed to mount engine resources.\n";
+        std::cerr << "[SilverwareEditorBackend]: Failed to mount engine resources.\n";
         return false;
     }
 
@@ -171,7 +171,7 @@ bool SilverwareEditorBackend::MountResources(EditorRuntime& editorRuntime)
 
     if (projectSource && !m_ResourceProvider->Mount("project", 0, projectSource))
     {
-        std::cerr << "[SilverwareBackend]: Failed to mount project resources.\n";
+        std::cerr << "[SilverwareEditorBackend]: Failed to mount project resources.\n";
         return false;
     }
 
@@ -182,7 +182,7 @@ bool SilverwareEditorBackend::InitializeRuntime(IPlatformWindow& window)
 {
     if (!m_RenderingContext || !m_ResourceProvider || !m_FontRegistry)
     {
-        std::cerr << "[SilverwareBackend]: Resources and rendering context must be ready before host initialization.\n";
+        std::cerr << "[SilverwareEditorBackend]: Resources and rendering context must be ready before host initialization.\n";
         return false;
     }
 
@@ -202,7 +202,7 @@ bool SilverwareEditorBackend::InitializeRuntime(IPlatformWindow& window)
 
     if (!Silverware::FResourcePath::TryParse(kSilverwareRootDocument, backendConfig.rootDocument))
     {
-        std::cerr << "[SilverwareBackend]: Invalid root document resource path.\n";
+        std::cerr << "[SilverwareEditorBackend]: Invalid root document resource path.\n";
         return false;
     }
 
@@ -223,7 +223,7 @@ bool SilverwareEditorBackend::InitializeRuntime(IPlatformWindow& window)
 
     if (!m_Host->Initialize(Silverware::TakeUniqueOwnership(hostConfig), &error))
     {
-        std::cerr << "[SilverwareBackend]: Silverware host initialization failed: "
+        std::cerr << "[SilverwareEditorBackend]: Silverware host initialization failed: "
                   << error << '\n';
 
         m_Host.reset();
@@ -241,7 +241,7 @@ bool SilverwareEditorBackend::InitializeRuntime(IPlatformWindow& window)
 
     if (!m_EditorUIContext)
     {
-        std::cerr << "[SilverwareBackend]: Failed to create editor UI context: "
+        std::cerr << "[SilverwareEditorBackend]: Failed to create editor UI context: "
                   << error << '\n';
 
         m_Host->Shutdown();
@@ -249,7 +249,7 @@ bool SilverwareEditorBackend::InitializeRuntime(IPlatformWindow& window)
         return false;
     }
 
-    // std::cout << "[SilverwareBackend]: Editor UI scale: display="
+    // std::cout << "[SilverwareEditorBackend]: Editor UI scale: display="
     //           << m_EditorUIContext->GetDisplayScale()
     //           << ", ui=" << m_EditorUIContext->GetUIScale()
     //           << ", effective=" << m_EditorUIContext->GetEffectiveScale()
@@ -259,7 +259,7 @@ bool SilverwareEditorBackend::InitializeRuntime(IPlatformWindow& window)
 
     if (!Silverware::FResourcePath::TryParse(kRedleafDarkStylesheet, path))
     {
-        std::cerr << "[SilverwareBackend]: Invalid stylesheet path: "
+        std::cerr << "[SilverwareEditorBackend]: Invalid stylesheet path: "
                   << kRedleafDarkStylesheet << '\n';
         return false;
     }
@@ -268,16 +268,14 @@ bool SilverwareEditorBackend::InitializeRuntime(IPlatformWindow& window)
 
     if (!result.Succeeded())
     {
-        std::cerr << "[SilverwareBackend]: Failed to load stylesheet "
+        std::cerr << "[SilverwareEditorBackend]: Failed to load stylesheet "
                   << kRedleafDarkStylesheet << ": " << result.message << '\n';
-        return false;
     }
 
     if (!SetActiveTheme(kRedleafDefaultThemeID, &error))
     {
-        std::cerr << "[SilverwareBackend]: Failed to activate the default editor theme: "
-                  << error << '\n';
-        return false;
+        std::cerr << "[SilverwareEditorBackend]: Failed to activate the default editor theme: "
+                  << error << '\n' << "Using fallback theme." << '\n';
     }
 
     return true;
