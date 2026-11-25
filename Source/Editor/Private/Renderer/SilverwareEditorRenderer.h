@@ -29,6 +29,8 @@
         Silverware::FEventConnection m_PrimaryButtonClickConnection;
         Silverware::FEventConnection m_ProgressBarSliderValueChangedConnection;
         Silverware::FEventConnection m_ProgressBarValueChangedConnection;
+        Silverware::FEventConnection m_TextInputChangedConnection;
+        Silverware::FEventConnection m_TextInputCommittedConnection;
         decltype(m_PrimaryButtonClickConnection) m_FontButtonClickConnections[3];
         decltype(m_PrimaryButtonClickConnection) m_CheckboxChangedConnections[2];
         decltype(m_PrimaryButtonClickConnection) m_RadioButtonChangedConnections[4];

@@ -31,6 +31,7 @@
 #include "Silverware/UI/Widgets/SliderWidget.h"
 #include "Silverware/UI/Widgets/RangedSliderWidget.h"
 #include "Silverware/UI/Widgets/ScrollViewWidget.h"
+#include "Silverware/UI/Widgets/TextInputWidget.h"
 
 namespace
 {
@@ -1022,6 +1023,26 @@ namespace
         widget->SetValue(value);
 
         SliderWidget* rawWidget = widget.get();
+
+        if (!parent.AddChild(Silverware::TUniquePtr<CoreWidget>(widget.release())))
+            return nullptr;
+
+        return rawWidget;
+    }
+
+    TextInputWidget* AddTextInput(
+        ContainerWidget& parent,
+        FWidgetLayout layout,
+        std::string hintText)
+    {
+        using namespace Silverware;
+
+        auto widget = Silverware::MakeUnique<TextInputWidget>();
+        widget->SetStyleVariant("Default");
+        widget->SetLayout(std::move(layout));
+        widget->SetHintText(std::move(hintText));
+
+        TextInputWidget* rawWidget = widget.get();
 
         if (!parent.AddChild(Silverware::TUniquePtr<CoreWidget>(widget.release())))
             return nullptr;
@@ -2141,6 +2162,103 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
                           << "].\n";
             });
 
+    // Text inputs.
+    if (!AddText(*m_ButtonPlayground, "TEXT INPUTS", "PanelTitle") ||
+        !AddText(*m_ButtonPlayground,
+            "Single-line editing, hints, selection, maximum length and read-only behavior.",
+            "Body"))
+    {
+        return false;
+    }
+
+    FWidgetLayout textInputLayout;
+    textInputLayout.width = FLayoutLength::Percent(90.f);
+
+    TextInputWidget* projectNameInput = AddTextInput(
+        *m_ButtonPlayground,
+        textInputLayout,
+        "Enter a project name...");
+    if (!projectNameInput)
+        return false;
+
+    TextWidget* projectNameValueLabel = AddText(
+        *m_ButtonPlayground,
+        "No text entered",
+        "Mono");
+    if (!projectNameValueLabel ||
+        !AddText(*m_ButtonPlayground,
+            "Try Ctrl/Cmd+A, Shift+Arrow selection and Enter to commit.",
+            "Body"))
+    {
+        return false;
+    }
+
+    m_TextInputChangedConnection = projectNameInput->OnTextChanged().Connect(
+        [projectNameValueLabel](FTextInputChangedEvent& event)
+        {
+            projectNameValueLabel->SetText(
+                event.newText.empty() ? "No text entered" : event.newText);
+        });
+
+    m_TextInputCommittedConnection = projectNameInput->OnTextCommitted().Connect(
+        [](FTextInputCommittedEvent& event)
+        {
+            const char* reason = event.reason == ETextCommitReason::Enter
+                ? "Enter"
+                : "Focus lost";
+
+            std::cout << "[SilverwarePlayground]: Text input committed ("
+                      << reason << "): \"" << event.text << "\"\n";
+        });
+
+    if (!AddText(*m_ButtonPlayground, "MAXIMUM LENGTH", "Kicker"))
+        return false;
+
+    TextInputWidget* limitedInput = AddTextInput(
+        *m_ButtonPlayground,
+        textInputLayout,
+        "Maximum 16 characters...");
+    if (!limitedInput)
+        return false;
+
+    limitedInput->SetMaxLength(std::size_t{16});
+
+    if (!AddText(*m_ButtonPlayground,
+            "The limit is measured in Unicode code points, not UTF-8 bytes.",
+            "Body") ||
+        !AddText(*m_ButtonPlayground, "READ-ONLY", "Kicker"))
+    {
+        return false;
+    }
+
+    TextInputWidget* readOnlyInput = AddTextInput(
+        *m_ButtonPlayground,
+        textInputLayout,
+        "Read-only value");
+    if (!readOnlyInput)
+        return false;
+
+    readOnlyInput->SetText("Build/Windows/RedleafEditor.exe");
+    readOnlyInput->SetReadOnly(true);
+
+    if (!AddText(*m_ButtonPlayground,
+            "You can focus, select and copy this value, but cannot modify it.",
+            "Body") ||
+        !AddText(*m_ButtonPlayground, "DISABLED", "Kicker"))
+    {
+        return false;
+    }
+
+    TextInputWidget* disabledInput = AddTextInput(
+        *m_ButtonPlayground,
+        textInputLayout,
+        "Disabled input");
+    if (!disabledInput)
+        return false;
+
+    disabledInput->SetText("Unavailable on this platform");
+    disabledInput->SetEnabled(false);
+
     // Progress bars.
     FWidgetLayout progressBarPlaygroundLayout;
     progressBarPlaygroundLayout.width = FLayoutLength::Percent(100.0f);
@@ -2383,8 +2501,8 @@ bool SilverwareEditorRenderer::BuildPlaygroundLayout()
             EJustification::SpaceBetween));
 
     if (!footer ||
-        !AddText(*footer, "Phase 2", "Success")
-        ||!AddText(*footer, "Extending Ranged Value Widgets + Scrollview", "Mono")
+        !AddText(*footer, "Phase 3", "Phase3")
+        ||!AddText(*footer, "Text Input + Selection", "Mono")
         )
     {
         return false;
@@ -2412,6 +2530,8 @@ void SilverwareEditorRenderer::Shutdown()
     }
 
     m_PrimaryButtonClickConnection.Disconnect();
+    m_TextInputChangedConnection.Disconnect();
+    m_TextInputCommittedConnection.Disconnect();
 
     for (auto& connection : m_FontButtonClickConnections)
         connection.Disconnect();
