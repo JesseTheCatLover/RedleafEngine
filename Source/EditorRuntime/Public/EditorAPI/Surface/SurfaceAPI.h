@@ -23,6 +23,11 @@ private:
 public:
     EditorSurfaceAPI(EngineContext& ctx, IPlatformSurface& surface, InputManager& inputManager);
 
+    [[nodiscard]] IPlatformSurface& GetPlatformSurface() const
+    {
+        return m_PlatformSurface;
+    }
+
     // File dialogs
     std::string OpenFileDialog(const char* filterList, const char* defaultPath);
     std::vector<std::string> OpenFileDialogMultiple(const char* filterList, const char* defaultPath);

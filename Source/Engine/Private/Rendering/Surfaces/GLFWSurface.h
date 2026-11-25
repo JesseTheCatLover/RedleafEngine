@@ -64,6 +64,9 @@ public:
     std::string OpenFolderDialog(const char *defaultPath) override;
     std::string SaveFileDialog(const char *filterList, const char *defaultPath, const char* defaultName = nullptr) override;
 
+    bool TryGetClipboardText(std::string& outText) override;
+    void SetClipboardText(std::string_view text) override;
+
 private:
     void UpdateCursor();
 };

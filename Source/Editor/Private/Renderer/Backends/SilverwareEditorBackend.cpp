@@ -18,6 +18,7 @@
 #include <string>
 #include <utility>
 
+#include "EditorInput/Silverware/SilverwareClipboardAdapter.h"
 #include "Silverware/UI/Management/UIWidgetManagerCollectionFactory.h"
 #include "Utilities/UFileSystem.h"
 
@@ -81,6 +82,8 @@ bool SilverwareEditorBackend::Initialize(EditorRuntime& editorRuntime, InputMana
     Shutdown();
 
     m_RenderingContext = editorRuntime.CreateSilverwareRenderingContext();
+
+    m_Clipboard = MakeShared<SilverwareClipboardAdapter>(editorRuntime.GetSurface().GetPlatformSurface());
 
     if (!m_RenderingContext)
     {
@@ -202,6 +205,8 @@ bool SilverwareEditorBackend::InitializeRuntime(IPlatformWindow& window)
         std::cerr << "[SilverwareBackend]: Invalid root document resource path.\n";
         return false;
     }
+
+    backendConfig.clipboard = m_Clipboard;
 
     Silverware::FSilverwareHostConfig hostConfig;
     hostConfig.backendRuntime = MakeUnique<Silverware::Backends::RmlUi::RmlUiBackendRuntime>(TakeUniqueOwnership(backendConfig));
@@ -382,6 +387,8 @@ void SilverwareEditorBackend::Shutdown()
 {
     // Disconnect input callbacks before destroying the UI context.
     m_InputBridge.reset();
+
+    m_Clipboard.reset();
 
     // Contexts must be destroyed before the shared backend and resources.
     m_EditorUIContext = nullptr;

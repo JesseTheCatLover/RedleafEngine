@@ -81,4 +81,7 @@ public:
         const char* filterList,
         const char* defaultPath,
         const char* defaultName) = 0;
+
+    virtual bool TryGetClipboardText(std::string& outText) = 0;
+    virtual void SetClipboardText(std::string_view text) = 0;
 };

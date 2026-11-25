@@ -12,6 +12,11 @@
 #include "Silverware/Backend/SilverwareUIContext.h"
 #include "Silverware/Core/Fonts/FontRegistry.h"
 
+namespace Silverware
+{
+    class IClipboard;
+}
+
 class InputManager;
 class SilverwareInputBridge;
 class EditorRuntime;
@@ -22,6 +27,8 @@ class SilverwareEditorBackend
 private:
     TUniquePtr<Silverware::IRenderingContext> m_RenderingContext;
     TUniquePtr<SilverwareInputBridge> m_InputBridge;
+
+    TSharedPtr<Silverware::IClipboard> m_Clipboard;
 
     // These are populated during initialization and transferred into SilverwareHost.
     TUniquePtr<Silverware::IMountableResourceProvider> m_ResourceProvider;

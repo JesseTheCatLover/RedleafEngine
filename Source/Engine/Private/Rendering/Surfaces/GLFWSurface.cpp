@@ -457,3 +457,27 @@ std::string GLFWSurface::SaveFileDialog(
 
     return path;
 }
+
+bool GLFWSurface::TryGetClipboardText(std::string& outText)
+{
+    outText.clear();
+
+    if (!m_Initialized || m_Shutdown)
+        return false;
+
+    const char* clipboardText = glfwGetClipboardString(nullptr);
+    if (!clipboardText)
+        return false;
+
+    outText = clipboardText;
+    return true;
+}
+
+void GLFWSurface::SetClipboardText(std::string_view text)
+{
+    if (!m_Initialized || m_Shutdown)
+        return;
+
+    const std::string utf8Text(text);
+    glfwSetClipboardString(nullptr, utf8Text.c_str());
+}
