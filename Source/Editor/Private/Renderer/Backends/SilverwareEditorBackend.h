@@ -7,9 +7,9 @@
 #include <string_view>
 
 #include "Core/Memory/SmartPointers.h"
-#include "Silverware/Backend/IRenderingContext.h"
-#include "Silverware/Backend/SilverwareHost.h"
-#include "Silverware/Backend/SilverwareUIContext.h"
+#include "Silverware/CoreBackend/IRenderingContext.h"
+#include "Silverware/CoreBackend/SilverwareHost.h"
+#include "Silverware/CoreBackend/SilverwareUIContext.h"
 #include "Silverware/Core/Fonts/FontRegistry.h"
 
 namespace Silverware

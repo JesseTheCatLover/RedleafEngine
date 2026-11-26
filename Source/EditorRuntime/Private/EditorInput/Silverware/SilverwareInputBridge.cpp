@@ -5,7 +5,7 @@
 #include <cmath>
 
 #include "EditorInput/Silverware/SilverwareInputTranslator.h"
-#include "Silverware/Backend/SilverwareUIContext.h"
+#include "Silverware/CoreBackend/SilverwareUIContext.h"
 
 SilverwareInputBridge::~SilverwareInputBridge()
 {

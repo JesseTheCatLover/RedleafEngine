@@ -8,7 +8,7 @@
 
 #include "Rendering/IRenderDevice.h"
 #include "Rendering/IRenderTargetProcessor.h"
-#include "Silverware/Backend/IRenderingContext.h"
+#include "Silverware/CoreBackend/IRenderingContext.h"
 
 class SilverwareRenderingContext final : public Silverware::IRenderingContext
 {
