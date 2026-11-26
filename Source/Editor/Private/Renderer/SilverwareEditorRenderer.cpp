@@ -433,8 +433,8 @@ namespace
      bool AddOverflowTextCase(
         ContainerWidget &parent,
         const char *label,
-        EOverflowMode overflowX,
-        EOverflowMode overflowY,
+        EOverflowVisibility overflowX,
+        EOverflowVisibility overflowY,
         EClipMode clipMode,
         EWhiteSpace whiteSpace,
         std::string text,
@@ -573,8 +573,8 @@ namespace
         if (!AddOverflowTextCase(
                 parent,
                 "VISIBLE / VISIBLE",
-                EOverflowMode::Visible,
-                EOverflowMode::Visible,
+                EOverflowVisibility::Visible,
+                EOverflowVisibility::Visible,
                 EClipMode::Auto,
                 EWhiteSpace::NoWrap,
                 kLongLine))
@@ -585,8 +585,8 @@ namespace
         if (!AddOverflowTextCase(
                 parent,
                 "HIDDEN / HIDDEN",
-                EOverflowMode::Hidden,
-                EOverflowMode::Hidden,
+                EOverflowVisibility::Hidden,
+                EOverflowVisibility::Hidden,
                 EClipMode::Auto,
                 EWhiteSpace::NoWrap,
                 kLongLine))
@@ -597,8 +597,8 @@ namespace
         if (!AddOverflowTextCase(
                 parent,
                 "HIDDEN X / VISIBLE Y",
-                EOverflowMode::Hidden,
-                EOverflowMode::Visible,
+                EOverflowVisibility::Hidden,
+                EOverflowVisibility::Visible,
                 EClipMode::Auto,
                 EWhiteSpace::Pre,
                 "FIRST LINE - LONG CONTENT THAT EXTENDS OUTSIDE THE FRAME\n"
@@ -620,8 +620,8 @@ namespace
         if (!AddOverflowTextCase(
                 parent,
                 "TRANSFORMED CHILD - FORCED CLIPPING",
-                EOverflowMode::Hidden,
-                EOverflowMode::Hidden,
+                EOverflowVisibility::Hidden,
+                EOverflowVisibility::Hidden,
                 EClipMode::Always,
                 EWhiteSpace::NoWrap,
                 kLongLine,
@@ -633,8 +633,8 @@ namespace
         if (!AddOverflowTextCase(
                 parent,
                 "TRANSFORMED CHILD - IGNORE ANCESTOR CLIP",
-                EOverflowMode::Hidden,
-                EOverflowMode::Hidden,
+                EOverflowVisibility::Hidden,
+                EOverflowVisibility::Hidden,
                 EClipMode::Always,
                 EWhiteSpace::NoWrap,
                 kLongLine,
@@ -708,8 +708,8 @@ namespace
         textWidget->SetLayout(textLayout);
 
         FWidgetOverflowStyle overflowStyle;
-        overflowStyle.overflowX = EOverflowMode::Hidden;
-        overflowStyle.overflowY = EOverflowMode::Hidden;
+        overflowStyle.overflowX = EOverflowVisibility::Hidden;
+        overflowStyle.overflowY = EOverflowVisibility::Hidden;
         textWidget->SetOverflowStyle(std::move(overflowStyle));
 
         outSamples.push_back({textWidget, std::move(baseStyle)});
